@@ -9,7 +9,7 @@ sign in to manage cases.
 
 1. Install Flutter (stable), Xcode with CocoaPods for iOS, and Android Studio for Android.
 2. Copy `config/env.example.json` to `config/env.json` and fill it in. Git ignores this file.
-   - `SITE_URL`: the published web origin, e.g. `https://example.com`. The app calls
+   - `SITE_URL`: the published web origin, `https://nmariewilson.ai`. The app calls
      `/api/submit-grievance`, `/api/intake`, `/api/chat` and the gateway at `/api/public/v1`.
    - `CITIZEN_API_KEY`: a key with the **citizen** scope only, created at `/tech → API keys`.
      Anyone can extract a key from an app binary, and gateway keys bypass row-level
@@ -35,6 +35,7 @@ Release builds take the same flag:
 | News, tracking by reference | Public gateway, `X-API-Key` with citizen scope |
 | News view counter | Supabase RPC `increment_news_view` |
 | Staff sign-in and all case work | Supabase email/password plus RLS, the same queries as the web admin |
+| Staff AI, intake, translation, team admin | `/api/public/v1/staff/*` with `Authorization: Bearer <staff access token>` |
 
 Staff never use API keys. Each staff member signs in, so the database rules (constituency
 scope, role capabilities, read-only roles) and the audit trail apply exactly as on the web.
@@ -69,14 +70,13 @@ Done:
   timeline), dashboard (KPIs, breakdowns, drill-down lists), map view, blocked citizens,
   departments, News Feed CMS.
 
-Needs new endpoints on the web app (today these are TanStack server functions, which
-non-browser clients can't call):
-- `GET /api/staff/team-names` and `GET /api/staff/assignees?grievance_id=`. The app already
-  calls them and, until they exist, shows "Team member" instead of names.
-- Contact-centre intake and editing (`saveStaffGrievance`, `draftFromCall`, `linkCallRecording`).
-- Translation, the admin AI assistant and the team analyst.
-- Team administration (create, grant, revoke, reset password), the roles editor and the groups editor.
-- `POST /api/staff/password-reset-request` for "Forgot password".
+- Staff features served by `/api/public/v1/staff/*` (the web's own server functions, called with the
+  staff member's sign-in token): team names and assignees, contact-centre intake and editing
+  (upload a call recording, transcribe it via `/api/staff-transcribe`, fill the form from the transcript,
+  save, attach the recording), translation (Tamil ↔ English) on case text and replies, the AI
+  assistant, the dashboard analyst (grievances and team modes), Team, Roles and Groups admin, and
+  "Forgot password".
 
-Not yet built: voice assistant (ElevenLabs), citizen OTP login and a "My grievances" list
-(both are switched off on the web today too), and CSV export.
+Not yet built: voice assistant (ElevenLabs), live call recording inside the app (staff upload a
+recording file instead), address autocomplete in staff intake (typed address plus map pin instead),
+citizen OTP login and a "My grievances" list (both are switched off on the web today too), and CSV export.

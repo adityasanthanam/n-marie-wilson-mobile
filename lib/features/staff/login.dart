@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/adaptive.dart';
+import '../../core/api.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
 import 'session.dart';
@@ -42,17 +43,22 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     }
   }
 
-  void _forgot() {
+  Future<void> _forgot() async {
     if (_email.text.trim().isEmpty) {
       setState(() => _error = 'Enter your email above, then tap Forgot password.');
       return;
     }
-    // The web's requestPasswordReset is a server function; the admin resets
-    // passwords from Admin → Team. Until a mobile endpoint exists, point staff there.
     setState(() {
-      _error = null;
-      _msg = 'Please inform the office administrator, who will set a new password for you from Admin → Team.';
+      _busy = true;
+      _error = _msg = null;
     });
+    try {
+      await Api.instance.forgotPassword(_email.text);
+      _msg = 'Please inform the office administrator. A password reset request has been sent to the admin, who will set a new password for you.';
+    } catch (_) {
+      _error = 'Could not send the request. Check your connection and try again.';
+    }
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
@@ -103,7 +109,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                             ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator.adaptive(strokeWidth: 2))
                             : const Text('Sign in'),
                       ),
-                      TextButton(onPressed: _forgot, child: const Text('Forgot password?')),
+                      TextButton(onPressed: _busy ? null : _forgot, child: const Text('Forgot password?')),
                       if (_msg != null) Notice(_msg!, error: false),
                       if (_error != null) Notice(_error!),
                     ]),

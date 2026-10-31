@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +14,7 @@ import '../../core/theme.dart';
 import '../../widgets/common.dart';
 import 'cases.dart' show SourceBadge;
 import 'data.dart';
+import 'intake.dart';
 import 'session.dart';
 import 'staff_meta.dart';
 
@@ -22,21 +22,6 @@ class _Attachment {
   _Attachment(this.name, this.url, this.mime, this.commentId);
   final String name, url;
   final String? mime, commentId;
-}
-
-String _uuid() {
-  final r = Random.secure();
-  final b = List<int>.generate(16, (_) => r.nextInt(256));
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
-  return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
-}
-
-String safeFileName(String name) {
-  final s = name.replaceAll(RegExp(r'[^\p{L}\p{N}._ -]', unicode: true), '_');
-  final cut = s.length > 120 ? s.substring(0, 120) : s;
-  return cut.isEmpty ? 'file' : cut;
 }
 
 class CaseDetailScreen extends StatefulWidget {
@@ -210,7 +195,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
         try {
           final name = f.path.split(Platform.pathSeparator).last;
           final ext = fileExt(name);
-          final path = '${widget.id}/replies/${_uuid()}.${ext.isEmpty ? 'bin' : ext}';
+          final path = '${widget.id}/replies/${uuidV4()}.${ext.isEmpty ? 'bin' : ext}';
           final mime = lookupMimeType(f.path) ?? 'application/octet-stream';
           await supa.storage.from('grievance-photos').upload(path, f, fileOptions: FileOptions(contentType: mime));
           await supa.from('grievance_attachments').insert({
@@ -301,6 +286,18 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
         automaticallyImplyLeading: !widget.embedded,
         title: Text(g == null ? 'Grievance' : '${g['reference_code']}'),
         actions: [
+          if (g != null && !_readOnly && g['is_abusive'] != true)
+            IconButton(
+              tooltip: 'Edit details',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () async {
+                final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => StaffIntakeScreen(grievance: g)));
+                if (saved == true) {
+                  await _load();
+                  widget.onChanged?.call();
+                }
+              },
+            ),
           if (g != null)
             IconButton(
               tooltip: 'Share with team',
@@ -348,11 +345,11 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                 margin: const EdgeInsets.only(top: 4, bottom: 10),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0xFFF4F4F5), borderRadius: BorderRadius.circular(8)),
-                child: SelectableText('${g['citizen_text']}'),
+                child: _Translatable('${g['citizen_text']}'),
               ),
               const Text("Assistant's write-up", style: TextStyle(fontSize: 12, color: Brand.muted)),
             ],
-            SelectableText('${g['description'] ?? ''}'),
+            _Translatable('${g['description'] ?? ''}'),
             if (g['summary'] != null && g['summary'] != g['description']) ...[
               const SizedBox(height: 6),
               Text('Summary: ${g['summary']}', style: const TextStyle(color: Brand.muted)),
@@ -497,7 +494,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
           ),
         ]),
         const SizedBox(height: 4),
-        SelectableText('${c['body'] ?? ''}'),
+        _Translatable('${c['body'] ?? ''}'),
         if (files.isNotEmpty) ...[const SizedBox(height: 6), _AttachmentList(files)],
       ]),
     );
@@ -639,6 +636,64 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
       ],
     ]);
   }
+}
+
+/// Text with a "Translate" toggle between Tamil and English (web translateText).
+class _Translatable extends StatefulWidget {
+  const _Translatable(this.text);
+  final String text;
+  @override
+  State<_Translatable> createState() => _TranslatableState();
+}
+
+class _TranslatableState extends State<_Translatable> {
+  String? _translated, _error;
+  bool _busy = false, _shown = false;
+
+  bool get _tamil => RegExp(r'[\u0B80-\u0BFF]').hasMatch(widget.text);
+
+  Future<void> _toggle() async {
+    if (_translated != null) return setState(() => _shown = !_shown);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final text = widget.text.length > 10000 ? widget.text.substring(0, 10000) : widget.text;
+      final r = await Api.instance.staff('ai/translate', body: {'text': text, 'target': _tamil ? 'en' : 'ta'}) as Map;
+      _translated = '${r['text'] ?? ''}';
+      _shown = true;
+    } catch (e) {
+      _error = e is ApiException ? e.message : 'Could not translate. Try again.';
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SelectableText(widget.text),
+        if (widget.text.trim().isNotEmpty)
+          TextButton.icon(
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12)),
+            onPressed: _busy ? null : _toggle,
+            icon: const Icon(Icons.translate, size: 16),
+            label: Text(_busy
+                ? 'Translating…'
+                : _shown
+                    ? 'Hide translation'
+                    : _tamil
+                        ? 'Translate to English'
+                        : 'Translate to Tamil'),
+          ),
+        if (_shown && _translated != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+            child: SelectableText(_translated!),
+          ),
+        if (_error != null) Text(_error!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+      ]);
 }
 
 class _AttachmentList extends StatelessWidget {

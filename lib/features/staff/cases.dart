@@ -176,6 +176,7 @@ class _CasesScreenState extends State<CasesScreen> {
       appBar: AppBar(
         title: const Text('Grievances'),
         actions: [
+          if (s.caps.aiEnabled) IconButton(tooltip: 'AI assistant', onPressed: () => context.push('/staff/assistant'), icon: const Icon(Icons.auto_awesome)),
           IconButton(tooltip: 'Open by ID', onPressed: _openById, icon: const Icon(Icons.tag)),
           PopupMenuButton<SortKey>(
             tooltip: 'Sort',
@@ -190,6 +191,13 @@ class _CasesScreenState extends State<CasesScreen> {
           ),
         ],
       ),
+      floatingActionButton: s.canEdit
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/staff/new').then((_) => _load()),
+              icon: const Icon(Icons.add),
+              label: const Text('New grievance'),
+            )
+          : null,
       body: _error != null
           ? ErrorBox('Could not load grievances.', onRetry: _load)
           : rows == null

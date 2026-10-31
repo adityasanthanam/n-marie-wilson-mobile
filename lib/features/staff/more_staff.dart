@@ -453,6 +453,12 @@ class StaffMoreScreen extends StatelessWidget {
               ListTile(leading: const Icon(Icons.block), title: const Text('Blocked citizens'), onTap: () => context.push('/staff/blocked')),
               ListTile(leading: const Icon(Icons.apartment), title: const Text('Departments'), onTap: () => context.push('/staff/departments')),
             ],
+            if (s.isAdmin) ...[
+              const Divider(),
+              ListTile(leading: const Icon(Icons.group_outlined), title: const Text('Team'), onTap: () => context.push('/staff/team')),
+              ListTile(leading: const Icon(Icons.admin_panel_settings_outlined), title: const Text('Roles'), onTap: () => context.push('/staff/roles')),
+              ListTile(leading: const Icon(Icons.workspaces_outline), title: const Text('Groups'), onTap: () => context.push('/staff/groups')),
+            ],
             const Divider(),
             ListTile(leading: const Icon(Icons.public), title: const Text('Open citizen app'), onTap: () => context.go('/')),
             ListTile(

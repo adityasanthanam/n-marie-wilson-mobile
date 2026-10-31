@@ -14,6 +14,8 @@ import 'package:marie_wilson/features/citizen/file_grievance.dart';
 import 'package:marie_wilson/features/citizen/home.dart';
 import 'package:marie_wilson/features/citizen/info_pages.dart';
 import 'package:marie_wilson/features/citizen/track.dart';
+import 'package:marie_wilson/features/staff/ai.dart';
+import 'package:marie_wilson/features/staff/intake.dart';
 
 class Device {
   const Device(this.name, this.size, {this.hinge});
@@ -75,6 +77,10 @@ void main() {
     'Helplines': () => const HelplinesPage(),
     'Initiatives': () => const InitiativesPage(),
     'More': () => const MoreScreen(),
+    'Staff new grievance': () => const StaffIntakeScreen(),
+    'Staff edit grievance': () => const StaffIntakeScreen(grievance: {'reference_code': 'MW-TEST0001', 'name': 'Test', 'area': 'Tondiarpet · House / apartment: 12B (Pinned location: 13.118000, 80.288000)'}),
+    'Staff AI assistant': () => const StaffAssistantScreen(),
+    'Staff analyst': () => Scaffold(body: ListView(children: [AnalystCard(buildData: () async => '{}'), AnalystCard(mode: 'grievances', buildData: () async => '{}')])),
   };
 
   for (final d in devices) {

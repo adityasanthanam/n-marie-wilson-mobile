@@ -1,8 +1,23 @@
-import 'dart:convert';
+import 'dart:math';
 
 import '../../core/api.dart';
 
 typedef DbRow = Map<String, dynamic>;
+
+String uuidV4() {
+  final r = Random.secure();
+  final b = List<int>.generate(16, (_) => r.nextInt(256));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+  return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+}
+
+String safeFileName(String name) {
+  final s = name.replaceAll(RegExp(r'[^\p{L}\p{N}._ -]', unicode: true), '_');
+  final cut = s.length > 120 ? s.substring(0, 120) : s;
+  return cut.isEmpty ? 'file' : cut;
+}
 
 class Department {
   Department(this.id, this.name, this.active, this.contacts);
@@ -41,16 +56,12 @@ class StaffData {
   static Future<List<DbRow>> groupMembers(String groupId) async =>
       List<DbRow>.from(await supa.from('staff_group_members').select('user_id').eq('group_id', groupId));
 
-  /// Assignable people for a case. Uses the web's assignee endpoint when available,
-  /// otherwise falls back to the case group's members.
+  /// Assignable people for a case (web listAssignees). Falls back to the case
+  /// group's members if the endpoint can't be reached.
   static Future<List<({String id, String name})>> assignees(DbRow g, String Function(String) nameOf) async {
     try {
-      final r = await Api.instance.staffGet('/api/staff/assignees', {'grievance_id': '${g['id']}'});
-      if (r.statusCode == 200) {
-        final body = jsonDecode(r.body);
-        final rows = (body is Map ? body['data'] : body) as List;
-        return [for (final m in rows) (id: '${m['userId']}', name: '${m['name']}')];
-      }
+      final rows = await Api.instance.staff('assignees', query: {'grievance_id': '${g['id']}'}) as List;
+      return [for (final m in rows) (id: '${m['userId']}', name: '${m['name']}')];
     } catch (_) {}
     final group = g['assigned_group'] as String?;
     if (group == null) return const [];

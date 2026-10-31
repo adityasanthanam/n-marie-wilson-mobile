@@ -146,15 +146,11 @@ class StaffSession extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Names come from the auth admin API on the server; uses the
-  /// /api/staff/team-names endpoint when the web app provides it.
+  /// Names come from the auth admin API on the server (web getTeamNames).
   Future<void> _loadTeamNames() async {
     try {
-      final r = await Api.instance.staffGet('/api/staff/team-names');
-      if (r.statusCode != 200) return;
-      final list = jsonDecode(r.body);
-      final rows = list is Map ? list['data'] : list;
-      teamNames = {for (final m in rows as List) '${m['userId']}': '${m['name']}'};
+      final rows = await Api.instance.staff('team-names') as List;
+      teamNames = {for (final m in rows) '${m['userId']}': '${m['name']}'};
       notifyListeners();
     } catch (_) {}
   }

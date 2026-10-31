@@ -114,7 +114,52 @@ class Api {
     }
   }
 
-  /// Staff-only routes that already accept a Supabase bearer token.
-  Future<http.Response> staffGet(String path, [Map<String, String>? q]) =>
-      _http.get(_site(path, q), headers: _bearer());
+  // ---- Staff endpoints (/api/public/v1/staff/*), authorised by the staff member's own sign-in ----
+
+  /// GET when [body] is null, POST otherwise. Unwraps `{data}`; a `{ok: false, error}` result throws.
+  Future<dynamic> staff(String path, {Map<String, dynamic>? body, Map<String, String>? query}) async {
+    final uri = _gw('/staff/$path', query);
+    final headers = {..._bearer(), 'Accept': 'application/json'};
+    final r = body == null
+        ? await _http.get(uri, headers: headers)
+        : await _http.post(uri, headers: {...headers, 'Content-Type': 'application/json'}, body: jsonEncode(body));
+    final data = (_decode(r) as Map)['data'];
+    if (data is Map && data['ok'] == false) throw ApiException(400, '${data['error'] ?? 'Request failed'}');
+    return data;
+  }
+
+  /// Records a request for an admin to reset the password; always succeeds.
+  Future<void> forgotPassword(String email) async => _decode(await _http.post(_gw('/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'}, body: jsonEncode({'email': email.trim()})));
+
+  /// Speech-to-text for call recordings (web: /api/staff-transcribe, streamed SSE).
+  Future<String> transcribe(File file) async {
+    final req = http.MultipartRequest('POST', _site('/api/staff-transcribe'))
+      ..headers.addAll(_bearer())
+      ..files.add(await http.MultipartFile.fromPath('file', file.path,
+          contentType: MediaType.parse(lookupMimeType(file.path) ?? 'audio/mpeg')));
+    final res = await _http.send(req);
+    if (res.statusCode >= 400) _decode(await http.Response.fromStream(res));
+    final buf = StringBuffer();
+    String? done;
+    final lines = res.stream.transform(utf8.decoder).transform(const LineSplitter());
+    await for (final line in lines) {
+      if (!line.startsWith('data:')) continue;
+      final data = line.substring(5).trim();
+      if (data == '[DONE]') break;
+      final e = jsonDecode(data);
+      switch (e['type']) {
+        case 'transcript.text.delta':
+          buf.write(e['delta'] ?? '');
+        case 'transcript.text.done':
+          done = '${e['text'] ?? ''}';
+        case 'error':
+          throw ApiException(502, '${e['error']?['message'] ?? 'Transcription failed.'}');
+      }
+    }
+    final text = (done ?? buf.toString()).trim();
+    if (text.isEmpty) throw ApiException(422, 'No speech was found in the recording.');
+    if (text.length > 10000) throw ApiException(413, 'The transcript is too long. Use a shorter recording.');
+    return text;
+  }
 }

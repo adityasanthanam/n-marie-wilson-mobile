@@ -119,6 +119,28 @@ const wards = <String, List<int>>{
 
 List<int> wardsFor(String? constituency) => wards[constituency] ?? const [];
 
+/// src/lib/wards.ts validWardNumber: empty is fine, otherwise it must belong to the constituency.
+bool validWardNumber(String? constituency, String ward) =>
+    ward.isEmpty || (RegExp(r'^\d+$').hasMatch(ward) && wardsFor(constituency).contains(int.parse(ward)));
+
+// Staff address format — src/lib/grievance-address.ts. The geocoder and map parse it, so keep it exact.
+typedef AddressPin = ({double lat, double lng});
+
+({String address, String details, AddressPin? pin}) splitGrievanceAddress(String area) {
+  final m = RegExp(r'\(?Pinned location:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\)?', caseSensitive: false).firstMatch(area);
+  final lat = double.tryParse(m?.group(1) ?? ''), lng = double.tryParse(m?.group(2) ?? '');
+  final pin = lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180 ? (lat: lat, lng: lng) : null;
+  final clean = area.replaceFirst(RegExp(r' ?\(?Pinned location:.*$', caseSensitive: false), '');
+  final parts = clean.split(' · House / apartment: ');
+  return (address: parts.first, details: parts.skip(1).join(' · House / apartment: '), pin: pin);
+}
+
+String combineGrievanceAddress(String address, String details, AddressPin? pin) {
+  String cut(String s, int n) => s.length > n ? s.substring(0, n) : s;
+  final text = [cut(address, 160), if (details.isNotEmpty) 'House / apartment: ${cut(details, 60)}'].where((s) => s.isNotEmpty).join(' · ');
+  return pin == null ? text : '$text (Pinned location: ${pin.lat.toStringAsFixed(6)}, ${pin.lng.toStringAsFixed(6)})';
+}
+
 /// The web carries an exact map pin inside the area text; the server parses it out.
 String areaWithPin(String area, double? lat, double? lng) {
   final typed = area.trim();

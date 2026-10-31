@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,7 +8,9 @@ import '../../core/api.dart';
 import '../../core/meta.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
+import 'ai.dart';
 import 'data.dart';
+import 'reporting.dart';
 import 'session.dart';
 import 'staff_meta.dart';
 
@@ -32,7 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final r = await Future.wait([
       supa
           .from('grievances')
-          .select('id, reference_code, name, contact, phone, category, constituency, ward_number, department_id, resolved_at, area, status, assigned_to, assigned_group, priority_level, priority_flag, corruption_type, women_safety, flooding, created_at, updated_at, summary, description, source, urgency, is_abusive, public_requested, public_approved, priority_score')
+          .select('id, reference_code, name, contact, phone, category, constituency, ward_number, department_id, department_assigned_at, resolved_at, area, status, assigned_to, assigned_group, priority_level, priority_flag, corruption_type, women_safety, flooding, created_at, updated_at, summary, description, source, urgency, is_abusive, public_requested, public_approved, priority_score')
           .eq('is_abusive', false)
           .order('created_at', ascending: false)
           .limit(5000),
@@ -141,6 +145,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           (g) => flagLabel(g['priority_flag'] as String?)),
                       _breakdown('By ward', scoped.where((g) => g['ward_number'] != null).toList(), (g) => 'Ward ${g['ward_number']}'),
                     ]),
+                    if (s.caps.aiEnabled) ...[
+                      const SizedBox(height: 16),
+                      ResponsiveGrid(minItemWidth: 420, children: [
+                        AnalystCard(key: ValueKey('g-$_range-$_constituency'), mode: 'grievances', buildData: () => _grievanceData(all, scoped)),
+                        AnalystCard(key: ValueKey('t-$_range-$_constituency'), buildData: () => _teamData(all, scoped)),
+                      ]),
+                    ],
                   ]),
                 ),
               ]),
@@ -148,6 +159,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         ),
       );
+
+  static String _conEn(Object? key) => constituencies.where((c) => c.key == key).firstOrNull?.en ?? 'Not specified';
+  static String _catEn(Object? c) => categories[normalizeCategory(c as String?)]!.en;
+
+  /// buildGrievanceData from admin.dashboard.tsx.
+  Future<String> _grievanceData(List<DbRow> all, List<DbRow> scoped) async {
+    final depts = await StaffData.departments().catchError((_) => <Department>[]);
+    String deptName(Object? id) => depts.where((d) => d.id == id).firstOrNull?.name ?? '$id';
+    final ownership = all.where((g) => _constituency == null || (g['constituency'] ?? 'none') == _constituency).toList();
+    return jsonEncode({
+      'period': {'label': _rangeLabels[_range], 'constituency': _constituency ?? 'all', 'group': 'all', 'department': 'all', 'ward': 'all'},
+      'coverage': {'total': scoped.length, 'missingWard': scoped.where((g) => g['ward_number'] == null).length},
+      'wards': withoutIds(statusSummary(scoped, (g) => g['ward_number'] == null ? 'Not specified' : 'Ward ${g['ward_number']} · ${_conEn(g['constituency'])}')),
+      'departments': [for (final r in withoutIds(resolutionByDepartment(scoped))) {...r, 'name': deptName(r['key'])}],
+      'categories': withoutIds(statusSummary(scoped, (g) => _catEn(g['category']))),
+      'recurringAreas': recurringAreas(scoped),
+      'weeklyResolutions': weeklyResolutions(ownership, _since, DateTime.now()),
+    });
+  }
+
+  /// buildTeamData from admin.dashboard.tsx; staff activity is fetched only when asked.
+  Future<String> _teamData(List<DbRow> all, List<DbRow> scoped) async {
+    final r = await Future.wait<dynamic>([
+      supa.from('grievance_status_history').select('grievance_id, status, changed_by, created_at').order('created_at', ascending: false).limit(10000),
+      supa
+          .from('grievance_comments')
+          .select('grievance_id, author_id, created_at')
+          .inFilter('author_role', ['admin', 'staff'])
+          .order('created_at', ascending: false)
+          .limit(10000),
+      StaffData.groupNames(),
+    ]);
+    final events = [
+      for (final e in r[0] as List) (id: e['grievance_id'], user: e['changed_by'] as String?, action: '${e['status']}', at: '${e['created_at']}'),
+      for (final e in r[1] as List) (id: e['grievance_id'], user: e['author_id'] as String?, action: 'reply', at: '${e['created_at']}'),
+    ];
+    final groups = r[2] as Map<String, String>;
+    final names = s.teamNames;
+    String nameOf(String id) => names[id] ?? 'Former team member (${id.length > 6 ? id.substring(0, 6) : id})';
+    final ids = {for (final g in scoped) g['id']};
+    final refOf = {for (final g in all) g['id']: g['reference_code']};
+    final sinceDay = _since == null ? '' : activityDay(_since!.toIso8601String());
+    final acts = events.where((e) => ids.contains(e.id) || sinceDay.isEmpty || activityDay(e.at).compareTo(sinceDay) >= 0).take(4000);
+    return jsonEncode({
+      'period': {
+        'label': _rangeLabels[_range],
+        'from': sinceDay.isEmpty ? 'beginning' : sinceDay,
+        'to': 'now',
+        'today': activityDay(DateTime.now().toIso8601String()),
+        'constituency': _constituency ?? 'all',
+        'group': 'all',
+      },
+      'team': names.values.toList(),
+      'tickets': [
+        for (final g in scoped.take(2500))
+          {
+            'ref': g['reference_code'],
+            'filed': activityDay('${g['created_at']}'),
+            'status': g['status'],
+            'assignee': g['assigned_to'] == null ? null : nameOf('${g['assigned_to']}'),
+            'group': groups[g['assigned_group']],
+            'constituency': g['constituency'],
+            'category': g['category'],
+            'priority': g['priority_level'],
+          }
+      ],
+      'actions': [
+        for (final e in acts)
+          {'who': e.user == null ? 'unknown' : nameOf(e.user!), 'ref': refOf[e.id] ?? 'outside current filters', 'action': e.action, 'day': activityDay(e.at)}
+      ],
+    });
+  }
 
   void _drill(String label, List<DbRow> rows) => context.push('/staff/list', extra: (label, rows));
 

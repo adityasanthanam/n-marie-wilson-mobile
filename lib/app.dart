@@ -13,11 +13,14 @@ import 'features/citizen/news.dart';
 import 'features/citizen/track.dart';
 import 'features/staff/case_detail.dart';
 import 'features/staff/cases.dart';
+import 'features/staff/ai.dart';
 import 'features/staff/dashboard.dart';
 import 'features/staff/data.dart';
+import 'features/staff/intake.dart';
 import 'features/staff/login.dart';
 import 'features/staff/more_staff.dart';
 import 'features/staff/session.dart';
+import 'features/staff/team_admin.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -80,6 +83,11 @@ GoRouter buildRouter() => GoRouter(
         GoRoute(path: '/staff/map', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffMapScreen()),
         GoRoute(path: '/staff/blocked', parentNavigatorKey: _rootKey, builder: (_, _) => const BlockedScreen()),
         GoRoute(path: '/staff/departments', parentNavigatorKey: _rootKey, builder: (_, _) => const DepartmentsScreen()),
+        GoRoute(path: '/staff/new', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffIntakeScreen()),
+        GoRoute(path: '/staff/assistant', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffAssistantScreen()),
+        GoRoute(path: '/staff/team', parentNavigatorKey: _rootKey, builder: (_, _) => const TeamScreen()),
+        GoRoute(path: '/staff/roles', parentNavigatorKey: _rootKey, builder: (_, _) => const RolesScreen()),
+        GoRoute(path: '/staff/groups', parentNavigatorKey: _rootKey, builder: (_, _) => const GroupsScreen()),
         GoRoute(
           path: '/staff/list',
           parentNavigatorKey: _rootKey,
