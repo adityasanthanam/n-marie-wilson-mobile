@@ -1,4 +1,4 @@
-package com.nmariewilson.marie_wilson
+package n.mariewilson.ai
 
 import io.flutter.embedding.android.FlutterActivity
 

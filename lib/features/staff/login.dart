@@ -63,7 +63,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Staff sign in')),
+        appBar: AppBar(leading: const NavBackButton(), title: const Text('Staff sign in')),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(

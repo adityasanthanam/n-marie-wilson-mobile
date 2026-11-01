@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.13.7
+  sdk: ^3.13.3
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -63,6 +63,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -72,11 +74,39 @@ flutter:
   assets:
     - assets/i18n/
     - assets/images/
+    - assets/branding/
+    - config/
 
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/app_icon.png
+  # Android masks the icon to a circle. The Android files keep the full artwork inside that safe area.
+  image_path_android: assets/branding/app_icon_android.png
+  image_path_ios: assets/branding/app_icon_ios.png
+  adaptive_icon_background: "#E6C3AF"
+  adaptive_icon_foreground: assets/branding/app_icon_android_foreground.png
+  adaptive_icon_foreground_inset: 0
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  background_color_ios: "#E6C3AF"
+
+flutter_native_splash:
+  # Color only — the branded animation lives in Flutter so it does not play twice.
+  color: "#FDF9F2"
+  color_dark: "#FDF9F2"
+  android_12:
+    color: "#FDF9F2"
+    color_dark: "#FDF9F2"
+    image: assets/branding/splash_blank.png
+    image_dark: assets/branding/splash_blank.png
+    icon_background_color: "#FDF9F2"
+    icon_background_color_dark: "#FDF9F2"
+  android: true
+  ios: true
+  web: false
 
   # To add assets to your application, add an assets section, like this:
   # assets:

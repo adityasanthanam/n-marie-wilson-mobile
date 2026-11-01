@@ -41,6 +41,12 @@ ThemeData buildTheme({required bool tamil, Brightness brightness = Brightness.li
       backgroundColor: brightness == Brightness.light ? Colors.white : const Color(0xFF09090B),
       titleTextStyle: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
     ),
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (context) {
+        final ios = Theme.of(context).platform == TargetPlatform.iOS || Theme.of(context).platform == TargetPlatform.macOS;
+        return Icon(ios ? Icons.arrow_back_ios_new : Icons.arrow_back, size: ios ? 20 : 24);
+      },
+    ),
     cardTheme: CardThemeData(
       elevation: 0,
       margin: EdgeInsets.zero,

@@ -119,7 +119,7 @@ class _LocationPickerState extends State<LocationPicker> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.nmariewilson.marie_wilson',
+                  userAgentPackageName: 'n.mariewilson.ai',
                 ),
                 MarkerLayer(markers: [
                   Marker(

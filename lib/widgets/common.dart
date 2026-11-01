@@ -1,9 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/i18n.dart';
 import '../core/meta.dart';
 import '../core/theme.dart';
+
+/// Pops the current route, or goes to [fallback] when this is the only page
+/// (so iOS always has a way back from Staff login / Assistant).
+void popOrGo(BuildContext context, {String fallback = '/'}) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(fallback);
+  }
+}
+
+class NavBackButton extends StatelessWidget {
+  const NavBackButton({super.key, this.fallback = '/'});
+  final String fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final ios = Theme.of(context).platform == TargetPlatform.iOS || Theme.of(context).platform == TargetPlatform.macOS;
+    return IconButton(
+      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+      icon: Icon(ios ? Icons.arrow_back_ios_new : Icons.arrow_back, size: ios ? 20 : 24),
+      onPressed: () => popOrGo(context, fallback: fallback),
+    );
+  }
+}
 
 class StatusPill extends StatelessWidget {
   const StatusPill(this.status, {super.key});

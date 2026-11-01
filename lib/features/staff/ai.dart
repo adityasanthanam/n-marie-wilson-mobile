@@ -57,7 +57,7 @@ class _StaffAssistantScreenState extends State<StaffAssistantScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('AI assistant')),
+    appBar: AppBar(leading: const NavBackButton(fallback: '/staff'), title: const Text('AI assistant')),
     body: SafeArea(
       top: false,
       child: Column(

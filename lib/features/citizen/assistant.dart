@@ -95,6 +95,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     LangScope.of(context);
     return Scaffold(
       appBar: AppBar(
+        leading: const NavBackButton(),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t('chat.title')),
           Row(children: [
