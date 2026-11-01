@@ -619,9 +619,138 @@ def render_story(size, story, screen, platform):
     draw_background(im)
     d = ImageDraw.Draw(im)
     scale = w / 1080
-    top = int((92 if h / w > 2.05 else 48) * scale)
+    # iPad canvases are much wider than a phone poster, so size the type from the height.
+    if h / w < 1.7:
+        scale = min(scale, h / 2200)
+    top = int((92 if h / w > 2.05 else 64) * scale)
     bottom = draw_headline(d, w, top, story[2], story[3], story[4], scale)
     place_phone(im, screen, bottom, platform)
+    return im.convert("RGB")
+
+
+def _wash(im: Image.Image, shapes: list[tuple]) -> None:
+    overlay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    for box, color in shapes:
+        od.ellipse(box, fill=color)
+    im.alpha_composite(overlay)
+
+
+def _portrait(im: Image.Image, box: tuple[int, int, int, int], radius: int, centering=(0.5, 0.30)) -> None:
+    x, y, w, h = box
+    photo = ImageOps.fit(
+        Image.open(PORTRAIT).convert("RGB"),
+        (w, h),
+        Image.Resampling.LANCZOS,
+        centering=centering,
+    )
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
+    im.paste(photo, (x, y), mask)
+
+
+def _pills(d: ImageDraw.ImageDraw, x: int, y: int, labels: list[str], size: int) -> None:
+    face = mfont(OUTFIT, size, 650)
+    pad_x = int(size * 0.95)
+    height = int(size * 2.15)
+    gap = int(size * 0.7)
+    for label in labels:
+        tw = int(face.getlength(label))
+        d.rounded_rectangle((x, y, x + tw + pad_x * 2, y + height), radius=height // 2, fill=WHITE)
+        d.text((x + pad_x, y + height / 2), label, font=face, fill=RED_DEEP, anchor="lm")
+        x += tw + pad_x * 2 + gap
+
+
+def product_page_header() -> Image.Image:
+    """21:9 product-page header. Important content stays inside Apple's safe area."""
+    w, h = 3840, 1646
+    im = Image.new("RGBA", (w, h), (*CREAM, 255))
+    sx, sy, sw, sh = 1097, 493, 1646, 661
+    pad = 48
+    photo_h = sh - pad * 2
+    photo_w = int(photo_h * 0.86)
+    photo_x = sx + sw - pad - photo_w
+    photo_y = sy + pad
+
+    _wash(
+        im,
+        [
+            ((-280, -420, int(w * 0.50), int(h * 0.72)), (255, 214, 204, 155)),
+            ((photo_x - 180, -520, w + 640, h + 520), (168, 14, 24, 255)),
+            ((photo_x + 220, -240, w + 820, h + 280), (120, 8, 16, 255)),
+            ((-520, int(h * 0.42), 900, h + 480), (132, 8, 16, 255)),
+        ],
+    )
+    _portrait(im, (photo_x, photo_y, photo_w, photo_h), 40)
+
+    d = ImageDraw.Draw(im)
+    text_x = sx + pad
+    text_w = photo_x - 64 - text_x
+    title_size = 76
+    while title_size > 48 and mfont(OUTFIT, title_size, 780).getlength("representative") > text_w:
+        title_size -= 2
+    line_h = int(title_size * 0.98)
+    block_h = 34 + 18 + line_h * 2 + 18 + 10 + 26 + 38 * 2
+    y = photo_y + (photo_h - block_h) // 2
+    d.text((text_x, y), "RADHAKRISHNAN NAGAR", font=mfont(OUTFIT, 26, 700), fill=BRAND, anchor="lt")
+    y += 34 + 18
+    d.text((text_x, y), "Know your", font=mfont(OUTFIT, title_size, 760), fill=INK, anchor="lt")
+    y += line_h
+    d.text((text_x, y), "representative", font=mfont(OUTFIT, title_size, 780), fill=RED_DEEP, anchor="lt")
+    y += line_h + 18
+    d.rounded_rectangle((text_x, y, text_x + 108, y + 10), radius=5, fill=BRAND)
+    y += 10 + 26
+    sub = mfont(OUTFIT, 28, 460)
+    d.text((text_x, y), "File a grievance, track it, and reach", font=sub, fill=(78, 62, 56), anchor="lt")
+    d.text((text_x, y + 38), "the office — in Tamil or English.", font=sub, fill=(78, 62, 56), anchor="lt")
+    return im.convert("RGB")
+
+
+def search_results_asset() -> Image.Image:
+    """3:2 search-results card. Important content stays inside Apple's safe area."""
+    w, h = 3840, 2560
+    im = Image.new("RGBA", (w, h), (*CREAM, 255))
+    sx, sy, sw, sh = 836, 765, 2168, 1030
+    pad = 52
+    photo_h = sh - pad * 2
+    photo_w = int(photo_h * 0.82)
+    photo_x = sx + sw - pad - photo_w
+    photo_y = sy + pad
+
+    _wash(
+        im,
+        [
+            ((-360, -480, int(w * 0.55), int(h * 0.62)), (255, 214, 204, 155)),
+            ((photo_x - 260, int(h * 0.08), w + 720, int(h * 1.05)), (168, 14, 24, 255)),
+            ((photo_x + 280, int(h * 0.18), w + 900, int(h * 0.95)), (120, 8, 16, 255)),
+            ((-640, int(h * 0.62), 760, h + 520), (132, 8, 16, 255)),
+        ],
+    )
+    _portrait(im, (photo_x, photo_y, photo_w, photo_h), 48, centering=(0.5, 0.28))
+
+    d = ImageDraw.Draw(im)
+    text_x = sx + pad
+    text_w = photo_x - 72 - text_x
+    title_size = 96
+    while title_size > 56 and mfont(OUTFIT, title_size, 780).getlength("representative") > text_w:
+        title_size -= 2
+    line_h = int(title_size * 0.98)
+    pill_h = int(30 * 2.15)
+    block_h = 40 + 20 + line_h * 2 + 20 + 12 + 28 + 46 * 2 + 36 + pill_h
+    y = photo_y + (photo_h - block_h) // 2
+    d.text((text_x, y), "RADHAKRISHNAN NAGAR", font=mfont(OUTFIT, 30, 700), fill=BRAND, anchor="lt")
+    y += 40 + 20
+    d.text((text_x, y), "Know your", font=mfont(OUTFIT, title_size, 760), fill=INK, anchor="lt")
+    y += line_h
+    d.text((text_x, y), "representative", font=mfont(OUTFIT, title_size, 780), fill=RED_DEEP, anchor="lt")
+    y += line_h + 20
+    d.rounded_rectangle((text_x, y, text_x + 124, y + 12), radius=6, fill=BRAND)
+    y += 12 + 28
+    sub = mfont(OUTFIT, 32, 460)
+    d.text((text_x, y), "File a grievance, track it, and reach", font=sub, fill=(78, 62, 56), anchor="lt")
+    y += 46
+    d.text((text_x, y), "the office — in Tamil or English.", font=sub, fill=(78, 62, 56), anchor="lt")
+    _pills(d, text_x, y + 46 + 36, ["File", "Track", "Assistant", "News"], 28)
     return im.convert("RGB")
 
 
@@ -669,7 +798,10 @@ def main():
         print("screen", key)
 
     specs = [
-        ("app-store", (1320, 2868), "ios"),
+        # iPhone with Dynamic Island (medium): 1206×2622 or 1179×2556.
+        ("app-store", (1206, 2622), "ios"),
+        # iPad 13-inch: 2064×2752 or 2048×2732.
+        ("app-store-ipad", (2064, 2752), "ios"),
         ("play-store", (1080, 1920), "android"),
     ]
     for prefix, size, platform in specs:
@@ -683,6 +815,16 @@ def main():
     feat_path = os.path.join(ROOT, "play-store-feature-graphic.png")
     feat.save(feat_path, "PNG", optimize=True)
     print(feat_path, feat.size)
+
+    header = product_page_header()
+    header_path = os.path.join(ROOT, "app-store-header.png")
+    header.save(header_path, "PNG", optimize=True)
+    print(header_path, header.size, header.mode)
+
+    search = search_results_asset()
+    search_path = os.path.join(ROOT, "app-store-search-results.png")
+    search.save(search_path, "PNG", optimize=True)
+    print(search_path, search.size, search.mode)
 
 
 if __name__ == "__main__":
