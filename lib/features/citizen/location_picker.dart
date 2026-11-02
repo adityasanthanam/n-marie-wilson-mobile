@@ -7,8 +7,121 @@ import '../../core/i18n.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
 
-/// GPS + movable pin (tap or drag the map), matching the web LocationPicker.
-/// Uses OpenStreetMap tiles so no native Maps SDK keys are needed.
+const _defaultCentre = LatLng(13.118, 80.288);
+
+TileLayer _tiles() => TileLayer(
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      userAgentPackageName: 'n.mariewilson.ai',
+    );
+
+typedef _Fix = ({LatLng? point, String? error, Future<bool> Function()? settings, String? title});
+
+/// Reads the GPS. Silent mode never prompts and never reports errors (used on open).
+Future<_Fix> _currentLocation({bool silent = false}) async {
+  _Fix fail(String en, String ta, [Future<bool> Function()? settings, String? title]) =>
+      (point: null, error: silent ? null : L(en, ta), settings: settings, title: title);
+  final allowTitle = L('Allow location access', 'இருப்பிட அனுமதியை வழங்கவும்');
+  try {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return fail('Location is turned off. Turn it on in your phone settings, or choose the spot on the map.',
+          'இருப்பிடம் முடக்கப்பட்டுள்ளது. தொலைபேசி அமைப்புகளில் இயக்கவும் அல்லது வரைபடத்தில் இடத்தைத் தேர்வு செய்யவும்.',
+          Geolocator.openLocationSettings,
+          L('Turn on location', 'இருப்பிடத்தை இயக்கவும்'));
+    }
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied && !silent) perm = await Geolocator.requestPermission();
+    if (perm == LocationPermission.deniedForever) {
+      return fail('Location permission is blocked for this app. Allow it in app settings, or choose the spot on the map.',
+          'இந்தச் செயலிக்கு இருப்பிட அனுமதி தடுக்கப்பட்டுள்ளது. அமைப்புகளில் அனுமதிக்கவும் அல்லது வரைபடத்தில் தேர்வு செய்யவும்.',
+          Geolocator.openAppSettings,
+          allowTitle);
+    }
+    if (perm == LocationPermission.denied) {
+      return fail('Please allow location access in app settings, or choose the spot on the map.',
+          'அமைப்புகளில் இருப்பிட அனுமதியை வழங்கவும் அல்லது வரைபடத்தில் இடத்தைத் தேர்வு செய்யவும்.',
+          Geolocator.openAppSettings,
+          allowTitle);
+    }
+    Position? p;
+    try {
+      p = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)));
+    } catch (_) {
+      // Indoors a GPS fix can time out; the last known position is usually close enough to start from.
+      p = await Geolocator.getLastKnownPosition();
+    }
+    if (p == null) {
+      return fail('Could not get a GPS fix. Try again near a window, or choose the spot on the map.',
+          'GPS இருப்பிடம் கிடைக்கவில்லை. சாளரத்தின் அருகே மீண்டும் முயலவும் அல்லது வரைபடத்தில் தேர்வு செய்யவும்.');
+    }
+    return (point: LatLng(p.latitude, p.longitude), error: null, settings: null, title: null);
+  } catch (_) {
+    return fail('Could not read your location on this device. Choose the spot on the map instead.',
+        'இந்தச் சாதனத்தில் இருப்பிடத்தைப் படிக்க முடியவில்லை. வரைபடத்தில் இடத்தைத் தேர்வு செய்யவும்.');
+  }
+}
+
+/// Shared "find me" behaviour: reads the GPS and, when location is off or not allowed, asks
+/// in a pop-up whether to open Settings, then tries again when the user comes back.
+mixin _Locating<T extends StatefulWidget> on State<T> {
+  bool _finding = false;
+  String? _error;
+  Future<bool> Function()? _settings;
+  AppLifecycleListener? _resume;
+
+  void _found(LatLng point);
+
+  @override
+  void dispose() {
+    _resume?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _locate({bool silent = false}) async {
+    setState(() {
+      _finding = true;
+      _error = null;
+      _settings = null;
+    });
+    final r = await _currentLocation(silent: silent);
+    if (!mounted) return;
+    setState(() {
+      _finding = false;
+      _error = r.error;
+      _settings = r.settings;
+    });
+    if (r.point != null) _found(r.point!);
+    if (r.settings != null && r.error != null) await _askToOpenSettings(r.title ?? '', r.error!, r.settings!);
+  }
+
+  Future<void> _askToOpenSettings(String title, String message, Future<bool> Function() open) async {
+    final go = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog.adaptive(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(L('Not now', 'இப்போது வேண்டாம்'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(L('Open settings', 'அமைப்புகளைத் திற'))),
+        ],
+      ),
+    );
+    if (go == true) await _openSettings(open);
+  }
+
+  Future<void> _openSettings(Future<bool> Function() open) async {
+    _resume?.dispose();
+    _resume = AppLifecycleListener(onResume: () {
+      _resume?.dispose();
+      _resume = null;
+      if (mounted) _locate();
+    });
+    await open();
+  }
+}
+
+/// GPS + map pin, matching the web LocationPicker. The map opens full screen so dragging it
+/// never fights with scrolling the form. Uses OpenStreetMap tiles, so no Maps SDK keys are needed.
 class LocationPicker extends StatefulWidget {
   const LocationPicker({super.key, required this.lat, required this.lng, required this.onChanged, this.autoLocate = true});
   final double? lat, lng;
@@ -18,11 +131,9 @@ class LocationPicker extends StatefulWidget {
   State<LocationPicker> createState() => _LocationPickerState();
 }
 
-class _LocationPickerState extends State<LocationPicker> {
-  static const _defaultCentre = LatLng(13.118, 80.288);
-  bool _finding = false, _mapOpen = false;
-  String? _error;
-  final _map = MapController();
+class _LocationPickerState extends State<LocationPicker> with _Locating {
+  @override
+  void _found(LatLng point) => widget.onChanged(point.latitude, point.longitude);
 
   @override
   void initState() {
@@ -30,40 +141,20 @@ class _LocationPickerState extends State<LocationPicker> {
     if (widget.autoLocate && widget.lat == null) _locate(silent: true);
   }
 
-  Future<void> _locate({bool silent = false}) async {
-    setState(() {
-      _finding = true;
-      _error = null;
-    });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) throw const LocationServiceDisabledException();
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied && !silent) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        if (!silent) {
-          setState(() => _error = L('Please allow location access, or just type the address above.',
-              'இருப்பிட அனுமதியை வழங்கவும் அல்லது மேலே முகவரியை உள்ளிடவும்.'));
-        }
-        return;
-      }
-      final p = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 12)));
-      widget.onChanged(p.latitude, p.longitude);
-      if (_mapOpen) _map.move(LatLng(p.latitude, p.longitude), 17);
-    } catch (_) {
-      if (!silent) {
-        setState(() => _error = L('Location sharing is not supported on this device.',
-            'இந்தச் சாதனத்தில் இருப்பிடப் பகிர்வு ஆதரிக்கப்படவில்லை.'));
-      }
-    } finally {
-      if (mounted) setState(() => _finding = false);
+  Future<void> _openMap() async {
+    final start = widget.lat != null && widget.lng != null ? LatLng(widget.lat!, widget.lng!) : null;
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => MapPickerScreen(initial: start)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _error = null);
+      widget.onChanged(picked.latitude, picked.longitude);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final has = widget.lat != null && widget.lng != null;
-    final point = has ? LatLng(widget.lat!, widget.lng!) : _defaultCentre;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Wrap(spacing: 8, runSpacing: 8, children: [
         OutlinedButton.icon(
@@ -76,9 +167,9 @@ class _LocationPickerState extends State<LocationPicker> {
               : L('Use current location', 'தற்போதைய இருப்பிடத்தைப் பயன்படுத்து')),
         ),
         OutlinedButton.icon(
-          onPressed: () => setState(() => _mapOpen = !_mapOpen),
-          icon: Icon(_mapOpen ? Icons.close : Icons.map_outlined, size: 18),
-          label: Text(_mapOpen ? L('Close map', 'வரைபடத்தை மூடு') : L('Choose on map', 'வரைபடத்தில் தேர்வு செய்')),
+          onPressed: _openMap,
+          icon: const Icon(Icons.map_outlined, size: 18),
+          label: Text(has ? L('Adjust on map', 'வரைபடத்தில் சரிசெய்') : L('Choose on map', 'வரைபடத்தில் தேர்வு செய்')),
         ),
       ]),
       if (has) ...[
@@ -98,51 +189,161 @@ class _LocationPickerState extends State<LocationPicker> {
             TextButton(onPressed: () => widget.onChanged(null, null), child: Text(L('Remove', 'நீக்கு'))),
           ]),
         ),
-      ],
-      if (_mapOpen) ...[
         const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            height: 240,
-            child: FlutterMap(
-              mapController: _map,
+        _Preview(point: LatLng(widget.lat!, widget.lng!), onTap: _openMap),
+      ],
+      if (_error != null) ...[
+        const SizedBox(height: 8),
+        Notice(_error!),
+        if (_settings != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(onPressed: () => _openSettings(_settings!), child: Text(L('Open settings', 'அமைப்புகளைத் திற'))),
+          ),
+      ],
+    ]);
+  }
+}
+
+/// Static thumbnail of the chosen spot; tapping it opens the full map.
+class _Preview extends StatelessWidget {
+  const _Preview({required this.point, required this.onTap});
+  final LatLng point;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          height: 150,
+          child: Stack(children: [
+            FlutterMap(
+              key: ValueKey(point),
               options: MapOptions(
                 initialCenter: point,
-                initialZoom: has ? 17 : 13,
-                onTap: (_, p) => widget.onChanged(p.latitude, p.longitude),
-                onPositionChanged: (camera, gesture) {
-                  // Dragging the map moves the pin under a fixed crosshair, like dragging a marker.
-                  if (gesture) widget.onChanged(camera.center.latitude, camera.center.longitude);
-                },
+                initialZoom: 16,
+                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'n.mariewilson.ai',
-                ),
+                _tiles(),
                 MarkerLayer(markers: [
                   Marker(
                     point: point,
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     alignment: Alignment.topCenter,
-                    child: const Icon(Icons.location_pin, color: Brand.red, size: 40),
+                    child: const Icon(Icons.location_pin, color: Brand.red, size: 36),
                   ),
                 ]),
-                const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
               ],
             ),
-          ),
+            // Sits above the map so the tap reaches us instead of the map.
+            Positioned.fill(child: Material(type: MaterialType.transparency, child: InkWell(onTap: onTap))),
+          ]),
         ),
-        const SizedBox(height: 4),
-        Text(
-          L('Drag the map or tap to place the pin at the exact spot. Your typed address is kept too.',
-              'வரைபடத்தை இழுக்கவும் அல்லது தட்டி சரியான இடத்தில் குறியீட்டை வைக்கவும். நீங்கள் உள்ளிட்ட முகவரியும் சேமிக்கப்படும்.'),
-          style: const TextStyle(fontSize: 12, color: Brand.muted),
-        ),
-      ],
-      if (_error != null) ...[const SizedBox(height: 8), Notice(_error!)],
-    ]);
+      );
+}
+
+/// Full-screen picker: the pin stays fixed in the centre and the map moves under it.
+class MapPickerScreen extends StatefulWidget {
+  const MapPickerScreen({super.key, this.initial});
+  final LatLng? initial;
+  @override
+  State<MapPickerScreen> createState() => _MapPickerScreenState();
+}
+
+class _MapPickerScreenState extends State<MapPickerScreen> with _Locating {
+  final _map = MapController();
+  late final _centre = ValueNotifier<LatLng>(widget.initial ?? _defaultCentre);
+
+  @override
+  void _found(LatLng point) => _map.move(point, 17);
+
+  @override
+  void dispose() {
+    _centre.dispose();
+    super.dispose();
   }
+
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(L('Choose location', 'இருப்பிடத்தைத் தேர்வு செய்'))),
+        body: Column(children: [
+          Expanded(
+            child: Stack(children: [
+              FlutterMap(
+                mapController: _map,
+                options: MapOptions(
+                  initialCenter: _centre.value,
+                  initialZoom: widget.initial != null ? 17 : 13,
+                  minZoom: 4,
+                  maxZoom: 19,
+                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
+                  onTap: (_, p) => _map.move(p, _map.camera.zoom),
+                  onPositionChanged: (camera, _) => _centre.value = camera.center,
+                ),
+                children: [
+                  _tiles(),
+                  const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                ],
+              ),
+              // The pin's tip marks the centre of the map.
+              const IgnorePointer(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 44),
+                    child: Icon(Icons.location_pin, color: Brand.red, size: 44),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 40,
+                child: FloatingActionButton.small(
+                  heroTag: null,
+                  tooltip: L('Use current location', 'தற்போதைய இருப்பிடத்தைப் பயன்படுத்து'),
+                  onPressed: _finding ? null : _locate,
+                  child: _finding
+                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator.adaptive(strokeWidth: 2))
+                      : const Icon(Icons.my_location),
+                ),
+              ),
+            ]),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+                Text(
+                  L('Move the map so the pin sits on the exact spot, or tap a place.',
+                      'குறியீடு சரியான இடத்தில் இருக்கும்படி வரைபடத்தை நகர்த்தவும் அல்லது ஓர் இடத்தைத் தட்டவும்.'),
+                  style: const TextStyle(fontSize: 12, color: Brand.muted),
+                ),
+                const SizedBox(height: 4),
+                ValueListenableBuilder<LatLng>(
+                  valueListenable: _centre,
+                  builder: (_, c, _) => Text('${c.latitude.toStringAsFixed(5)}, ${c.longitude.toStringAsFixed(5)}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Notice(_error!),
+                  if (_settings != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(onPressed: () => _openSettings(_settings!), child: Text(L('Open settings', 'அமைப்புகளைத் திற'))),
+                    ),
+                ],
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(_centre.value),
+                  icon: const Icon(Icons.check),
+                  label: Text(L('Use this location', 'இந்த இருப்பிடத்தைப் பயன்படுத்து')),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+      );
 }
