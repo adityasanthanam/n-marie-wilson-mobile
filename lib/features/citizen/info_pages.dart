@@ -16,7 +16,7 @@ class MoreScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     LangScope.of(context);
     Widget tile(IconData i, String label, String route) =>
-        ListTile(leading: Icon(i), title: Text(label), trailing: const Icon(Icons.chevron_right), onTap: () => context.go(route));
+        ListTile(leading: Icon(i), title: Text(label), trailing: const Icon(Icons.chevron_right), onTap: () => context.push(route));
     return Scaffold(
       appBar: AppBar(title: Text(L('More', 'மேலும்')), actions: const [LangToggle()]),
       body: ListView(children: [
@@ -51,7 +51,7 @@ class _Page extends StatelessWidget {
   Widget build(BuildContext context) {
     LangScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(title), actions: const [LangToggle()]),
+      appBar: AppBar(leading: const NavBackButton(fallback: '/more'), title: Text(title), actions: const [LangToggle()]),
       body: SafeArea(
         top: false,
         child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -97,7 +97,9 @@ Widget _card(String tag, String title, String body) => Card(
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
   @override
-  Widget build(BuildContext context) => _Page(title: t('nav.about'), children: [
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return _Page(title: t('nav.about'), children: [
         SectionTitle(t('about.title'), kicker: t('nav.about')),
         _p(t('about.lead')),
         LayoutBuilder(builder: (c, box) {
@@ -114,12 +116,15 @@ class AboutPage extends StatelessWidget {
         _photo('assets/images/marie-wilson-vijay.webp'),
         Text(t('common.photoCaption'), style: const TextStyle(fontSize: 12, color: Brand.muted)),
       ]);
+  }
 }
 
 class MinistryPage extends StatelessWidget {
   const MinistryPage({super.key});
   @override
-  Widget build(BuildContext context) => _Page(title: t('nav.ministry'), children: [
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return _Page(title: t('nav.ministry'), children: [
         Row(children: [
           Image.asset('assets/images/tn-emblem.png', width: 48),
           const SizedBox(width: 12),
@@ -141,12 +146,15 @@ class MinistryPage extends StatelessWidget {
         _photo('assets/images/marie-wilson-vijay.webp'),
         Text(t('common.photoCaption'), style: const TextStyle(fontSize: 12, color: Brand.muted)),
       ]);
+  }
 }
 
 class ConstituencyPage extends StatelessWidget {
   const ConstituencyPage({super.key});
   @override
-  Widget build(BuildContext context) => _Page(title: t('nav.constituency'), children: [
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return _Page(title: t('nav.constituency'), children: [
         SectionTitle(t('constituency.title'), kicker: t('nav.constituency')),
         _p(t('constituency.sub')),
         ResponsiveGrid(minItemWidth: 160, children: [
@@ -164,7 +172,7 @@ class ConstituencyPage extends StatelessWidget {
             child: FlutterMap(
               options: const MapOptions(initialCenter: LatLng(13.124, 80.29), initialZoom: 14),
               children: [
-                TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.nmariewilson.marie_wilson'),
+                TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'n.mariewilson.ai'),
                 const MarkerLayer(markers: [
                   Marker(point: LatLng(13.124, 80.29), alignment: Alignment.topCenter, child: Icon(Icons.location_pin, color: Brand.red, size: 40)),
                 ]),
@@ -174,12 +182,14 @@ class ConstituencyPage extends StatelessWidget {
           ),
         ),
       ]);
+  }
 }
 
 class InitiativesPage extends StatelessWidget {
   const InitiativesPage({super.key});
   @override
   Widget build(BuildContext context) {
+    LangScope.of(context);
     String ip(String k) => t('initiativesPage.$k');
     return _Page(title: t('nav.initiatives'), children: [
       SectionTitle(ip('headerTitle'), kicker: ip('headerTag')),
@@ -240,7 +250,9 @@ class InitiativesPage extends StatelessWidget {
 class ContactPage extends StatelessWidget {
   const ContactPage({super.key});
   @override
-  Widget build(BuildContext context) => _Page(title: t('nav.contact'), children: [
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return _Page(title: t('nav.contact'), children: [
         SectionTitle(t('contact.title'), kicker: t('nav.contact')),
         _p(t('contact.sub')),
         ResponsiveGrid(children: [
@@ -270,13 +282,16 @@ class ContactPage extends StatelessWidget {
           ),
         ]),
       ]);
+  }
 }
 
 class RkNagarHelplineCard extends StatelessWidget {
   const RkNagarHelplineCard({super.key, this.compact = false});
   final bool compact;
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -300,12 +315,15 @@ class RkNagarHelplineCard extends StatelessWidget {
           ]),
         ),
       );
+  }
 }
 
 class HelplinesPage extends StatelessWidget {
   const HelplinesPage({super.key});
   @override
-  Widget build(BuildContext context) => _Page(title: L('Helplines', 'உதவி எண்கள்'), children: [
+  Widget build(BuildContext context) {
+    LangScope.of(context);
+    return _Page(title: L('Helplines', 'உதவி எண்கள்'), children: [
         const RkNagarHelplineCard(),
         const SizedBox(height: 12),
         FilledButton.icon(
@@ -327,4 +345,5 @@ class HelplinesPage extends StatelessWidget {
             ),
         ]),
       ]);
+  }
 }

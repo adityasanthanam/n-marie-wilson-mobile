@@ -88,7 +88,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
                 child: FlutterMap(
                   options: const MapOptions(initialCenter: LatLng(13.118, 80.288), initialZoom: 13),
                   children: [
-                    TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.nmariewilson.marie_wilson'),
+                    TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'n.mariewilson.ai'),
                     MarkerLayer(markers: [
                       for (final g in shown)
                         Marker(

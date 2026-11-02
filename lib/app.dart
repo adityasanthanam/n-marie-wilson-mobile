@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +24,23 @@ import 'features/staff/session.dart';
 import 'features/staff/team_admin.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
+
+/// Cupertino pages enable the iOS edge-swipe back gesture with go_router.
+Page<void> _cupertino(GoRouterState state, Widget child) =>
+    CupertinoPage<void>(key: state.pageKey, child: child);
+
+GoRoute _page(
+  String path,
+  Widget Function(BuildContext, GoRouterState) builder, {
+  GlobalKey<NavigatorState>? parentNavigatorKey,
+  List<RouteBase> routes = const [],
+}) =>
+    GoRoute(
+      path: path,
+      parentNavigatorKey: parentNavigatorKey,
+      pageBuilder: (context, state) => _cupertino(state, builder(context, state)),
+      routes: routes,
+    );
 
 GoRouter buildRouter() => GoRouter(
       navigatorKey: _rootKey,
@@ -56,18 +74,18 @@ GoRouter buildRouter() => GoRouter(
             StatefulShellBranch(routes: [GoRoute(path: '/news', builder: (_, _) => const NewsScreen())]),
             StatefulShellBranch(routes: [
               GoRoute(path: '/more', builder: (_, _) => const MoreScreen(), routes: [
-                GoRoute(path: 'helplines', builder: (_, _) => const HelplinesPage()),
-                GoRoute(path: 'about', builder: (_, _) => const AboutPage()),
-                GoRoute(path: 'ministry', builder: (_, _) => const MinistryPage()),
-                GoRoute(path: 'constituency', builder: (_, _) => const ConstituencyPage()),
-                GoRoute(path: 'initiatives', builder: (_, _) => const InitiativesPage()),
-                GoRoute(path: 'contact', builder: (_, _) => const ContactPage()),
+                _page('helplines', (_, _) => const HelplinesPage()),
+                _page('about', (_, _) => const AboutPage()),
+                _page('ministry', (_, _) => const MinistryPage()),
+                _page('constituency', (_, _) => const ConstituencyPage()),
+                _page('initiatives', (_, _) => const InitiativesPage()),
+                _page('contact', (_, _) => const ContactPage()),
               ]),
             ]),
           ],
         ),
-        GoRoute(path: '/assistant', parentNavigatorKey: _rootKey, builder: (_, _) => const AssistantScreen()),
-        GoRoute(path: '/staff/login', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffLoginScreen()),
+        _page('/assistant', parentNavigatorKey: _rootKey, (_, _) => const AssistantScreen()),
+        _page('/staff/login', parentNavigatorKey: _rootKey, (_, _) => const StaffLoginScreen()),
         StatefulShellRoute.indexedStack(
           builder: (context, state, shell) => _StaffShell(shell: shell),
           branches: [
@@ -79,23 +97,19 @@ GoRouter buildRouter() => GoRouter(
             StatefulShellBranch(routes: [GoRoute(path: '/staff/more', builder: (_, _) => const StaffMoreScreen())]),
           ],
         ),
-        GoRoute(path: '/staff/case/:id', parentNavigatorKey: _rootKey, builder: (_, s) => CaseDetailScreen(id: s.pathParameters['id']!)),
-        GoRoute(path: '/staff/map', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffMapScreen()),
-        GoRoute(path: '/staff/blocked', parentNavigatorKey: _rootKey, builder: (_, _) => const BlockedScreen()),
-        GoRoute(path: '/staff/departments', parentNavigatorKey: _rootKey, builder: (_, _) => const DepartmentsScreen()),
-        GoRoute(path: '/staff/new', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffIntakeScreen()),
-        GoRoute(path: '/staff/assistant', parentNavigatorKey: _rootKey, builder: (_, _) => const StaffAssistantScreen()),
-        GoRoute(path: '/staff/team', parentNavigatorKey: _rootKey, builder: (_, _) => const TeamScreen()),
-        GoRoute(path: '/staff/roles', parentNavigatorKey: _rootKey, builder: (_, _) => const RolesScreen()),
-        GoRoute(path: '/staff/groups', parentNavigatorKey: _rootKey, builder: (_, _) => const GroupsScreen()),
-        GoRoute(
-          path: '/staff/list',
-          parentNavigatorKey: _rootKey,
-          builder: (_, s) {
-            final (label, rows) = s.extra as (String, List<DbRow>);
-            return DrillListScreen(label: label, rows: rows);
-          },
-        ),
+        _page('/staff/case/:id', parentNavigatorKey: _rootKey, (_, s) => CaseDetailScreen(id: s.pathParameters['id']!)),
+        _page('/staff/map', parentNavigatorKey: _rootKey, (_, _) => const StaffMapScreen()),
+        _page('/staff/blocked', parentNavigatorKey: _rootKey, (_, _) => const BlockedScreen()),
+        _page('/staff/departments', parentNavigatorKey: _rootKey, (_, _) => const DepartmentsScreen()),
+        _page('/staff/new', parentNavigatorKey: _rootKey, (_, _) => const StaffIntakeScreen()),
+        _page('/staff/assistant', parentNavigatorKey: _rootKey, (_, _) => const StaffAssistantScreen()),
+        _page('/staff/team', parentNavigatorKey: _rootKey, (_, _) => const TeamScreen()),
+        _page('/staff/roles', parentNavigatorKey: _rootKey, (_, _) => const RolesScreen()),
+        _page('/staff/groups', parentNavigatorKey: _rootKey, (_, _) => const GroupsScreen()),
+        _page('/staff/list', parentNavigatorKey: _rootKey, (_, s) {
+          final (label, rows) = s.extra as (String, List<DbRow>);
+          return DrillListScreen(label: label, rows: rows);
+        }),
       ],
     );
 

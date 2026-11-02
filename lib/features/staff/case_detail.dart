@@ -403,7 +403,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
           child: FlutterMap(
             options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: pin ? 17 : 15),
             children: [
-              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.nmariewilson.marie_wilson'),
+              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'n.mariewilson.ai'),
               MarkerLayer(markers: [
                 Marker(point: LatLng(lat, lng), alignment: Alignment.topCenter, child: const Icon(Icons.location_pin, color: Brand.red, size: 40)),
               ]),
