@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Store preview images for the Office of Dr. N. Marie Wilson app."""
+"""Store preview images for the Citizen Desk app."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+APP_ICON = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/assets/branding/app_icon.png"
 PORTRAIT = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/assets/images/marie-wilson-portrait.jpg"
 OUTFIT = "/tmp/mw-fonts/outfit-test.ttf"
 TAMIL = "/tmp/mw-fonts/NotoSansTamil.ttf"
@@ -754,10 +755,16 @@ def search_results_asset() -> Image.Image:
     return im.convert("RGB")
 
 
+def _rounded_icon(size: int, radius: int) -> tuple[Image.Image, Image.Image]:
+    icon = ImageOps.fit(Image.open(APP_ICON).convert("RGB"), (size, size), Image.Resampling.LANCZOS)
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
+    return icon, mask
+
+
 def feature_graphic() -> Image.Image:
     w, h = 1024, 500
     im = Image.new("RGBA", (w, h), (*CREAM, 255))
-    d = ImageDraw.Draw(im)
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
     od.ellipse((620, -180, 1280, 680), fill=(168, 14, 24, 255))
@@ -765,15 +772,15 @@ def feature_graphic() -> Image.Image:
     od.ellipse((-80, -160, 420, 220), fill=(255, 214, 204, 160))
     im.alpha_composite(overlay)
     d = ImageDraw.Draw(im)
-    kicker = mfont(OUTFIT, 22, 700)
-    d.text((56, 78), "RADHAKRISHNAN NAGAR", font=kicker, fill=BRAND)
-    title = mfont(OUTFIT, 64, 780)
-    d.text((56, 112), "Know your", font=title, fill=INK)
-    d.text((56, 176), "representative", font=title, fill=RED_DEEP)
-    d.rounded_rectangle((56, 262, 148, 270), radius=4, fill=BRAND)
+    kicker = mfont(OUTFIT, 20, 700)
+    d.text((56, 72), "CIVIC HELPDESK", font=kicker, fill=BRAND)
+    title = mfont(OUTFIT, 72, 780)
+    d.text((56, 102), "Citizen", font=title, fill=INK)
+    d.text((56, 176), "Desk", font=title, fill=RED_DEEP)
+    d.rounded_rectangle((56, 268, 148, 276), radius=4, fill=BRAND)
     sub = mfont(OUTFIT, 24, 460)
-    d.text((56, 294), "File a grievance, track it, and reach", font=sub, fill=(78, 62, 56))
-    d.text((56, 328), "the office — in Tamil or English.", font=sub, fill=(78, 62, 56))
+    d.text((56, 300), "File a grievance, track it, and follow", font=sub, fill=(78, 62, 56))
+    d.text((56, 334), "local issues — in Tamil or English.", font=sub, fill=(78, 62, 56))
     pills = ["File", "Track", "Assistant", "News"]
     x = 56
     pf = mfont(OUTFIT, 18, 650)
@@ -782,10 +789,14 @@ def feature_graphic() -> Image.Image:
         d.rounded_rectangle((x, 392, x + tw + 36, 432), radius=20, fill=WHITE)
         d.text((x + 18, 412), pill, font=pf, fill=RED_DEEP, anchor="lm")
         x += tw + 48
-    photo = ImageOps.fit(Image.open(PORTRAIT).convert("RGB"), (300, 380), Image.Resampling.LANCZOS, centering=(0.5, 0.28))
-    mask = Image.new("L", photo.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, 299, 379), radius=28, fill=255)
-    im.paste(photo, (680, 60), mask)
+    size = 288
+    icon, mask = _rounded_icon(size, 64)
+    ix, iy = 680, (h - size) // 2
+    shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle((ix + 10, iy + 16, ix + size - 2, iy + size + 8), radius=64, fill=(40, 4, 8, 90))
+    im.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14)))
+    im.paste(icon, (ix, iy), mask)
     return im.convert("RGB")
 
 

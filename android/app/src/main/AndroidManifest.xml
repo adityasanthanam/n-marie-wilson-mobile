@@ -7,7 +7,7 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 
     <application
-        android:label="Marie Wilson"
+        android:label="Citizen Desk"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 
-/// Animated launch screen: portrait, TVK badge, then the office wordmark.
+/// Animated launch screen: civic mark, then the Citizen Desk wordmark.
 class BrandSplash extends StatefulWidget {
   const BrandSplash({super.key, this.onFinished});
   final VoidCallback? onFinished;
@@ -18,10 +18,6 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
   late final Animation<double> _portraitFade = CurvedAnimation(parent: _intro, curve: const Interval(0.0, 0.42, curve: Curves.easeOut));
   late final Animation<double> _portraitScale = Tween(begin: 0.82, end: 1.0).animate(
     CurvedAnimation(parent: _intro, curve: const Interval(0.0, 0.48, curve: Curves.easeOutCubic)),
-  );
-  late final Animation<double> _badgeFade = CurvedAnimation(parent: _intro, curve: const Interval(0.28, 0.58, curve: Curves.easeOut));
-  late final Animation<double> _badgeScale = Tween(begin: 0.2, end: 1.0).animate(
-    CurvedAnimation(parent: _intro, curve: const Interval(0.28, 0.68, curve: Curves.elasticOut)),
   );
   late final Animation<double> _titleFade = CurvedAnimation(parent: _intro, curve: const Interval(0.46, 0.74, curve: Curves.easeOut));
   late final Animation<Offset> _titleSlide = Tween(begin: const Offset(0, 0.35), end: Offset.zero).animate(
@@ -59,58 +55,37 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
               builder: (context, _) {
                 final glow = 0.35 + _pulse.value * 0.25;
                 return Column(mainAxisSize: MainAxisSize.min, children: [
-                  SizedBox(
-                    width: portrait + 36,
-                    height: portrait + 36,
-                    child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-                      Opacity(
-                        opacity: _portraitFade.value,
-                        child: Transform.scale(
-                          scale: _portraitScale.value,
-                          child: Container(
-                            width: portrait,
-                            height: portrait,
+                  Opacity(
+                    opacity: _portraitFade.value,
+                    child: Transform.scale(
+                      scale: _portraitScale.value,
+                      child: Container(
+                        width: portrait,
+                        height: portrait,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Brand.red, width: 3),
+                          boxShadow: [
+                            BoxShadow(color: Brand.gold.withValues(alpha: glow * 0.45), blurRadius: 28, spreadRadius: 2),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: DecoratedBox(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Brand.red, width: 3),
-                              boxShadow: [
-                                BoxShadow(color: Brand.gold.withValues(alpha: glow * 0.45), blurRadius: 28, spreadRadius: 2),
-                              ],
+                              border: Border.all(color: Brand.gold, width: 2.5),
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.all(3),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Brand.gold, width: 2.5),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2.5),
-                                  child: ClipOval(
-                                    child: Image.asset(
-                                      'assets/images/marie-wilson-portrait.jpg',
-                                      fit: BoxFit.cover,
-                                      alignment: const Alignment(0, -0.42),
-                                    ),
-                                  ),
-                                ),
+                              padding: const EdgeInsets.all(2.5),
+                              child: ClipOval(
+                                child: Image.asset('assets/branding/app_icon.png', fit: BoxFit.cover),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      Positioned(
-                        right: 0,
-                        bottom: 4,
-                        child: Opacity(
-                          opacity: _badgeFade.value,
-                          child: Transform.scale(
-                            scale: _badgeScale.value,
-                            child: Image.asset('assets/branding/tvk-badge-hires.png', width: 72, height: 72),
-                          ),
-                        ),
-                      ),
-                    ]),
+                    ),
                   ),
                   const SizedBox(height: 28),
                   FadeTransition(
@@ -118,7 +93,7 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
                     child: SlideTransition(
                       position: _titleSlide,
                       child: const Text(
-                        'Dr. N. Marie Wilson',
+                        'Citizen Desk',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: Brand.ink, letterSpacing: -0.3),
                       ),
@@ -128,7 +103,7 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
                   FadeTransition(
                     opacity: _subFade,
                     child: const Text(
-                      'Office of the Minister',
+                      'Citizen grievance app',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Brand.muted, fontWeight: FontWeight.w500),
                     ),

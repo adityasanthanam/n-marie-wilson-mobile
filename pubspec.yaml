@@ -1,5 +1,5 @@
 name: marie_wilson
-description: "Office of Dr. N. Marie Wilson — citizen grievance and staff app."
+description: "Citizen Desk — citizen grievance and staff app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.13.3
@@ -86,12 +86,12 @@ flutter_launcher_icons:
   # Android masks the icon to a circle. The Android files keep the full artwork inside that safe area.
   image_path_android: assets/branding/app_icon_android.png
   image_path_ios: assets/branding/app_icon_ios.png
-  adaptive_icon_background: "#E6C3AF"
+  adaptive_icon_background: "#BE1F1F"
   adaptive_icon_foreground: assets/branding/app_icon_android_foreground.png
   adaptive_icon_foreground_inset: 0
   min_sdk_android: 21
   remove_alpha_ios: true
-  background_color_ios: "#E6C3AF"
+  background_color_ios: "#BE1F1F"
 
 flutter_native_splash:
   # Color only — the branded animation lives in Flutter so it does not play twice.

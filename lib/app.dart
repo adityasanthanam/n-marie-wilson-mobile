@@ -239,7 +239,7 @@ class _MarieWilsonAppState extends State<MarieWilsonApp> {
         child: ListenableBuilder(
           listenable: widget.lang,
           builder: (context, _) => MaterialApp.router(
-            title: 'Dr. N. Marie Wilson',
+            title: 'Citizen Desk',
             debugShowCheckedModeBanner: false,
             theme: buildTheme(tamil: widget.lang.ta),
             locale: widget.lang.locale,
