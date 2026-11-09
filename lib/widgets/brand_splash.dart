@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 
-/// Animated launch screen: civic mark, then the Citizen Desk wordmark.
+/// Animated launch screen: civic mark, then the NMW Connect wordmark.
 class BrandSplash extends StatefulWidget {
   const BrandSplash({super.key, this.onFinished});
   final VoidCallback? onFinished;
@@ -93,7 +93,7 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
                     child: SlideTransition(
                       position: _titleSlide,
                       child: const Text(
-                        'Citizen Desk',
+                        'NMW Connect',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: Brand.ink, letterSpacing: -0.3),
                       ),
