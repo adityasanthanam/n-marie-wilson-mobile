@@ -24,14 +24,48 @@ class Department {
   final String id, name;
   final bool active;
   final List<Map<String, dynamic>> contacts;
-  factory Department.fromRow(DbRow r) => Department('${r['id']}', '${r['name']}', r['active'] != false,
-      [for (final c in (r['contacts'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)]);
+  factory Department.fromRow(DbRow r) => Department('${r['id']}', '${r['name']}', r['active'] != false, [
+    for (final c in (r['contacts'] as List? ?? const [])) Map<String, dynamic>.from(c as Map),
+  ]);
+}
+
+const pageSize = 1000;
+
+/// Reads every page in a stable caller-supplied order (paginated-read.ts).
+/// Throws rather than returning a partial list.
+Future<List<DbRow>> readAllPages(Future<List<dynamic>> Function(int from, int to) page) async {
+  final rows = <DbRow>[];
+  for (var from = 0; ; from += pageSize) {
+    final data = await page(from, from + pageSize - 1);
+    rows.addAll(data.map((r) => Map<String, dynamic>.from(r as Map)));
+    if (data.length < pageSize) return rows;
+  }
+}
+
+/// Reads per-case rows (history, comments) for [ids] in batches of 200,
+/// a few batches at a time, each batch fully paged.
+Future<List<DbRow>> readCasePages(
+  List<String> ids,
+  Future<List<dynamic>> Function(List<String> batch, int from, int to) page, {
+  int parallel = 4,
+}) async {
+  final batches = [for (var i = 0; i < ids.length; i += 200) ids.sublist(i, i + 200 > ids.length ? ids.length : i + 200)];
+  final rows = <DbRow>[];
+  for (var i = 0; i < batches.length; i += parallel) {
+    final chunk = batches.skip(i).take(parallel);
+    for (final part in await Future.wait(chunk.map((b) => readAllPages((from, to) => page(b, from, to))))) {
+      rows.addAll(part);
+    }
+  }
+  return rows;
 }
 
 /// Direct Supabase reads, scoped by the caller's RLS exactly like the web.
 class StaffData {
-  static Future<List<DbRow>> grievances() async =>
-      List<DbRow>.from(await supa.from('grievances').select('*').order('created_at', ascending: false).limit(1000));
+  /// Every visible grievance, newest first. Pages past the 1,000-row response
+  /// cap so board counts and reports are never silently short (web fix baf9169).
+  static Future<List<DbRow>> grievances() =>
+      readAllPages((from, to) => supa.from('grievances').select('*').order('created_at', ascending: false).order('id').range(from, to));
 
   static Future<Map<String, String>> groupNames() async {
     final rows = await supa.from('staff_groups').select('id, name').order('name');

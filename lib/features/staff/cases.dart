@@ -49,6 +49,7 @@ class _CasesScreenState extends State<CasesScreen> {
   String _q = '';
   String? _selected;
   int _shown = 50;
+  bool _board = true; // Board by stage is the default, as on the web.
 
   @override
   void initState() {
@@ -122,9 +123,9 @@ class _CasesScreenState extends State<CasesScreen> {
       SortKey.newest => byDate,
       SortKey.oldest => (a, b) => -byDate(a, b),
       SortKey.priority => (a, b) {
-          final d = ((b['priority_score'] as num?) ?? -1).compareTo((a['priority_score'] as num?) ?? -1);
-          return d != 0 ? d : byDate(a, b);
-        },
+        final d = ((b['priority_score'] as num?) ?? -1).compareTo((a['priority_score'] as num?) ?? -1);
+        return d != 0 ? d : byDate(a, b);
+      },
     });
     return list;
   }
@@ -162,7 +163,7 @@ class _CasesScreenState extends State<CasesScreen> {
   }
 
   void _open(String id) {
-    if (context.isCompact) {
+    if (context.isCompact || _board) {
       context.push('/staff/case/$id').then((_) => _load());
     } else {
       setState(() => _selected = id);
@@ -176,7 +177,8 @@ class _CasesScreenState extends State<CasesScreen> {
       appBar: AppBar(
         title: const Text('Grievances'),
         actions: [
-          if (s.caps.aiEnabled) IconButton(tooltip: 'AI assistant', onPressed: () => context.push('/staff/assistant'), icon: const Icon(Icons.auto_awesome)),
+          if (s.caps.aiEnabled)
+            IconButton(tooltip: 'AI assistant', onPressed: () => context.push('/staff/assistant'), icon: const Icon(Icons.auto_awesome)),
           IconButton(tooltip: 'Open by ID', onPressed: _openById, icon: const Icon(Icons.tag)),
           PopupMenuButton<SortKey>(
             tooltip: 'Sort',
@@ -201,14 +203,20 @@ class _CasesScreenState extends State<CasesScreen> {
       body: _error != null
           ? ErrorBox('Could not load grievances.', onRetry: _load)
           : rows == null
-              ? const Center(child: CircularProgressIndicator.adaptive())
-              : RefreshIndicator.adaptive(onRefresh: _load, child: _listBody(rows)),
+          ? const Center(child: CircularProgressIndicator.adaptive())
+          : RefreshIndicator.adaptive(onRefresh: _load, child: _listBody(rows)),
     );
     return TwoPane(
       primaryFraction: 0.42,
       primary: list,
-      secondary: _selected == null
-          ? const Scaffold(body: Center(child: Text('Select a grievance', style: TextStyle(color: Brand.muted))))
+      secondary: _board
+          ? null
+          : _selected == null
+          ? const Scaffold(
+              body: Center(
+                child: Text('Select a grievance', style: TextStyle(color: Brand.muted)),
+              ),
+            )
           : CaseDetailScreen(key: ValueKey(_selected), id: _selected!, embedded: true, onChanged: _load),
     );
   }
@@ -218,26 +226,59 @@ class _CasesScreenState extends State<CasesScreen> {
     final open = rows.where((g) => !isClosed(g['status'] as String?));
     final persons = _personCounts;
     final page = visible.take(_shown).toList();
-    return ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 96), children: [
-      // Status count tiles (tap to filter).
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final e in statuses.entries)
-          FilterChip(
-            selected: _filters.statuses.contains(e.key),
-            onSelected: (v) => setState(() => v ? _filters.statuses.add(e.key) : _filters.statuses.remove(e.key)),
-            label: Text('${e.value.en} · ${rows.where((g) => (g['status'] ?? 'received') == e.key).length}'),
-          ),
-      ]),
+    final header = <Widget>[
+      SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: false, label: Text('List'), icon: Icon(Icons.view_list)),
+          ButtonSegment(value: true, label: Text('Board by stage'), icon: Icon(Icons.view_column)),
+        ],
+        selected: {_board},
+        onSelectionChanged: (v) => setState(() => _board = v.first),
+      ),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        _concern("Women's safety", open.where(isWomenSafety).length, _filters.women, const Color(0xFFBE123C),
-            (v) => setState(() => _filters.women = v)),
-        _concern('Flooding', open.where((g) => g['flooding'] == true).length, _filters.flooding, const Color(0xFF0369A1),
-            (v) => setState(() => _filters.flooding = v)),
-        if (!s.caps.hideCorruption)
-          _concern('Corruption', open.where((g) => g['corruption_type'] != null).length, _filters.corruption,
-              const Color(0xFFB91C1C), (v) => setState(() => _filters.corruption = v)),
-      ]),
+      // Status count tiles (tap to filter).
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final e in statuses.entries)
+            FilterChip(
+              selected: _filters.statuses.contains(e.key),
+              onSelected: (v) => setState(() => v ? _filters.statuses.add(e.key) : _filters.statuses.remove(e.key)),
+              label: Text('${e.value.en} · ${rows.where((g) => (g['status'] ?? 'received') == e.key).length}'),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _concern(
+            "Women's safety",
+            open.where(isWomenSafety).length,
+            _filters.women,
+            const Color(0xFFBE123C),
+            (v) => setState(() => _filters.women = v),
+          ),
+          _concern(
+            'Flooding',
+            open.where((g) => g['flooding'] == true).length,
+            _filters.flooding,
+            const Color(0xFF0369A1),
+            (v) => setState(() => _filters.flooding = v),
+          ),
+          if (!s.caps.hideCorruption)
+            _concern(
+              'Corruption',
+              open.where((g) => g['corruption_type'] != null).length,
+              _filters.corruption,
+              const Color(0xFFB91C1C),
+              (v) => setState(() => _filters.corruption = v),
+            ),
+        ],
+      ),
       const SizedBox(height: 8),
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -245,8 +286,7 @@ class _CasesScreenState extends State<CasesScreen> {
           showSelectedIcon: false,
           segments: [
             const ButtonSegment(value: Queue.all, label: Text('All')),
-            ButtonSegment(
-                value: Queue.unassigned, label: Text('Unassigned (${open.where((g) => g['assigned_to'] == null).length})')),
+            ButtonSegment(value: Queue.unassigned, label: Text('Unassigned (${open.where((g) => g['assigned_to'] == null).length})')),
             const ButtonSegment(value: Queue.groups, label: Text('My groups')),
             const ButtonSegment(value: Queue.me, label: Text('Assigned to me')),
           ],
@@ -258,51 +298,74 @@ class _CasesScreenState extends State<CasesScreen> {
         ),
       ),
       const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-          child: TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search ref, name, phone, area…', isDense: true),
-            onChanged: (v) => setState(() {
-              _q = v;
-              _shown = 50;
-            }),
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search ref, name, phone, area…', isDense: true),
+              onChanged: (v) => setState(() {
+                _q = v;
+                _shown = 50;
+              }),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Badge(
-          isLabelVisible: _filters.count > 0,
-          label: Text('${_filters.count}'),
-          child: OutlinedButton.icon(onPressed: _openFilters, icon: const Icon(Icons.tune, size: 18), label: const Text('Filters')),
-        ),
-      ]),
+          const SizedBox(width: 8),
+          Badge(
+            isLabelVisible: _filters.count > 0,
+            label: Text('${_filters.count}'),
+            child: OutlinedButton.icon(onPressed: _openFilters, icon: const Icon(Icons.tune, size: 18), label: const Text('Filters')),
+          ),
+        ],
+      ),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text('${visible.length} shown', style: const TextStyle(color: Brand.muted, fontSize: 12)),
       ),
-      for (final g in page)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: CaseCard(
-            g: g,
-            selected: g['id'] == _selected,
-            repeat: persons[personKey(g)] ?? 1,
-            group: _groups[g['assigned_group']],
-            department: _departments.where((d) => d.id == g['department_id']).firstOrNull?.name,
-            onTap: () => _open('${g['id']}'),
-          ),
+    ];
+    if (_board) {
+      // The board fills the screen once the controls scroll away; each column scrolls on its own.
+      return LayoutBuilder(
+        builder: (context, box) => ListView(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          children: [
+            ...header,
+            SizedBox(
+              height: (box.maxHeight - 24).clamp(360.0, double.infinity),
+              child: StageBoard(rows: visible, departments: _departments, onOpen: (id) => _open(id)),
+            ),
+          ],
         ),
-      if (visible.length > _shown)
-        OutlinedButton(onPressed: () => setState(() => _shown += 50), child: Text('Show more (${visible.length - _shown} left)')),
-    ]);
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+      children: [
+        ...header,
+        for (final g in page)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: CaseCard(
+              g: g,
+              selected: g['id'] == _selected,
+              repeat: persons[personKey(g)] ?? 1,
+              group: _groups[g['assigned_group']],
+              department: _departments.where((d) => d.id == g['department_id']).firstOrNull?.name,
+              onTap: () => _open('${g['id']}'),
+            ),
+          ),
+        if (visible.length > _shown)
+          OutlinedButton(onPressed: () => setState(() => _shown += 50), child: Text('Show more (${visible.length - _shown} left)')),
+      ],
+    );
   }
 
   Widget _concern(String label, int openCount, bool on, Color color, ValueChanged<bool> set) => FilterChip(
-        selected: on,
-        onSelected: set,
-        selectedColor: color.withValues(alpha: 0.15),
-        avatar: Icon(Icons.warning_amber_rounded, size: 16, color: color),
-        label: Text('$label ($openCount open)'),
-      );
+    selected: on,
+    onSelected: set,
+    selectedColor: color.withValues(alpha: 0.15),
+    avatar: Icon(Icons.warning_amber_rounded, size: 16, color: color),
+    label: Text('$label ($openCount open)'),
+  );
 
   Future<void> _openFilters() async {
     await showModalBottomSheet(
@@ -310,40 +373,62 @@ class _CasesScreenState extends State<CasesScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-        void toggle(Set<String> s, String v) => set(() => setState(() => s.contains(v) ? s.remove(v) : s.add(v)));
-        Widget group(String title, Set<String> sel, Map<String, String> options) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          void toggle(Set<String> s, String v) => set(() => setState(() => s.contains(v) ? s.remove(v) : s.add(v)));
+          Widget group(String title, Set<String> sel, Map<String, String> options) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final o in options.entries)
-                    FilterChip(label: Text(o.value), selected: sel.contains(o.key), onSelected: (_) => toggle(sel, o.key)),
-                ]),
-              ]),
-            );
-        Widget check(String label, bool v, void Function(bool) on) =>
-            CheckboxListTile.adaptive(dense: true, contentPadding: EdgeInsets.zero, title: Text(label), value: v, onChanged: (x) => set(() => setState(() => on(x ?? false))));
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.85,
-          builder: (ctx, scroll) => ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
-            Row(children: [
-              const Expanded(child: Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-              TextButton(onPressed: () => set(() => setState(_filters.clear)), child: const Text('Clear filters')),
-            ]),
-            group('Status', _filters.statuses, {for (final e in statuses.entries) e.key: e.value.en}),
-            group('Constituency', _filters.constituencies, {for (final c in constituencies) c.key: c.en, 'none': 'Not specified'}),
-            group('Category', _filters.categories, {for (final e in categories.entries) e.key: e.value.en}),
-            group('Priority', _filters.priorities, {for (final p in priorityLevels) p: p[0].toUpperCase() + p.substring(1)}),
-            if (_departments.isNotEmpty) group('Department', _filters.departments, {for (final d in _departments) d.id: d.name}),
-            check('Pending public requests', _filters.pendingPublic, (v) => _filters.pendingPublic = v),
-            check('Repeat complainants', _filters.repeat, (v) => _filters.repeat = v),
-            check('Contact center', _filters.contactCenter, (v) => _filters.contactCenter = v),
-          ]),
-        );
-      }),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final o in options.entries)
+                      FilterChip(label: Text(o.value), selected: sel.contains(o.key), onSelected: (_) => toggle(sel, o.key)),
+                  ],
+                ),
+              ],
+            ),
+          );
+          Widget check(String label, bool v, void Function(bool) on) => CheckboxListTile.adaptive(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(label),
+            value: v,
+            onChanged: (x) => set(() => setState(() => on(x ?? false))),
+          );
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.85,
+            builder: (ctx, scroll) => ListView(
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    ),
+                    TextButton(onPressed: () => set(() => setState(_filters.clear)), child: const Text('Clear filters')),
+                  ],
+                ),
+                group('Status', _filters.statuses, {for (final e in statuses.entries) e.key: e.value.en}),
+                group('Constituency', _filters.constituencies, {for (final c in constituencies) c.key: c.en, 'none': 'Not specified'}),
+                group('Category', _filters.categories, {for (final e in categories.entries) e.key: e.value.en}),
+                group('Priority', _filters.priorities, {for (final p in priorityLevels) p: p[0].toUpperCase() + p.substring(1)}),
+                if (_departments.isNotEmpty) group('Department', _filters.departments, {for (final d in _departments) d.id: d.name}),
+                check('Pending public requests', _filters.pendingPublic, (v) => _filters.pendingPublic = v),
+                check('Repeat complainants', _filters.repeat, (v) => _filters.repeat = v),
+                check('Contact center', _filters.contactCenter, (v) => _filters.contactCenter = v),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -366,10 +451,13 @@ class CaseCard extends StatelessWidget {
     final created = parseDate(g['created_at']);
     final flag = g['priority_flag'] as String?;
     final assignee = g['assigned_to'] as String?;
-    Widget kv(String k, String v) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(k, style: const TextStyle(fontSize: 11, color: Brand.muted)),
-          Text(v, style: const TextStyle(fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
-        ]);
+    Widget kv(String k, String v) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(k, style: const TextStyle(fontSize: 11, color: Brand.muted)),
+        Text(v, style: const TextStyle(fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+      ],
+    );
     return Card(
       color: selected ? const Color(0xFFFEF2F2) : null,
       shape: RoundedRectangleBorder(
@@ -381,53 +469,82 @@ class CaseCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text('${g['reference_code']}', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, color: Brand.red)),
-              const SizedBox(width: 6),
-              SourceBadge(g),
-              const Spacer(),
-              StatusPill(g['status'] as String?),
-            ]),
-            const SizedBox(height: 6),
-            Wrap(spacing: 6, runSpacing: 4, children: [
-              Pill('${level ?? 'Unscored'}${g['priority_score'] != null ? ' · ${g['priority_score']}' : ''}', bg: pc.bg, fg: pc.fg),
-              if (isWomenSafety(g)) const Pill("Women's safety", bg: Color(0xFFBE123C), fg: Colors.white),
-              if (flag != null && flag != 'none' && flag != 'women_safety') Pill(flagLabel(flag), bg: const Color(0xFFFEE2E2), fg: const Color(0xFFB91C1C)),
-              if (g['flooding'] == true) const Pill('Flooding', bg: Color(0xFF0369A1), fg: Colors.white),
-              if (corruptionLabel(g['corruption_type'] as String?) != null && !s.caps.hideCorruption)
-                Pill(corruptionLabel(g['corruption_type'] as String?)!, bg: const Color(0xFFB91C1C), fg: Colors.white),
-              if (g['urgency'] == 'high') const Pill('URGENT', bg: Color(0xFFFEE2E2), fg: Color(0xFFB91C1C)),
-              if (g['is_abusive'] == true) const Pill('ABUSE', bg: Color(0xFFDC2626), fg: Colors.white),
-              if (g['public_requested'] == true) Pill(g['public_approved'] == true ? 'PUBLIC' : 'PUBLIC?'),
-            ]),
-            const SizedBox(height: 8),
-            Text('${g['summary'] ?? g['description'] ?? ''}', maxLines: 3, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 8),
-            LayoutBuilder(builder: (c, box) {
-              final cols = box.maxWidth > 420 ? 3 : 2;
-              final w = (box.maxWidth - 8 * (cols - 1)) / cols;
-              return Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final cell in [
-                  kv('Citizen', [g['name'], g['contact']].whereType<String>().join(' · ')),
-                  kv('Category', catLabel(g['category'] as String?)),
-                  kv('Constituency', '${constituencyLabel(g['constituency'] as String?)}${g['ward_number'] != null ? ' · Ward ${g['ward_number']}' : ''}'),
-                  kv('Filed', created == null ? '—' : Lang.instance.date(created)),
-                  kv('Assigned to', assignee != null ? s.nameOf(assignee) : group != null ? 'Not picked yet · $group' : 'Unassigned'),
-                  kv('Days pending', pendingLabel(g)),
-                ])
-                  SizedBox(width: w, child: cell),
-              ]);
-            }),
-            if (department != null) ...[
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '${g['reference_code']}',
+                    style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, color: Brand.red),
+                  ),
+                  const SizedBox(width: 6),
+                  SourceBadge(g),
+                  const Spacer(),
+                  StatusPill(g['status'] as String?),
+                ],
+              ),
               const SizedBox(height: 6),
-              Text('Department: $department', style: const TextStyle(fontSize: 12, color: Brand.muted)),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Pill('${level ?? 'Unscored'}${g['priority_score'] != null ? ' · ${g['priority_score']}' : ''}', bg: pc.bg, fg: pc.fg),
+                  if (isWomenSafety(g)) const Pill("Women's safety", bg: Color(0xFFBE123C), fg: Colors.white),
+                  if (flag != null && flag != 'none' && flag != 'women_safety')
+                    Pill(flagLabel(flag), bg: const Color(0xFFFEE2E2), fg: const Color(0xFFB91C1C)),
+                  if (g['flooding'] == true) const Pill('Flooding', bg: Color(0xFF0369A1), fg: Colors.white),
+                  if (corruptionLabel(g['corruption_type'] as String?) != null && !s.caps.hideCorruption)
+                    Pill(corruptionLabel(g['corruption_type'] as String?)!, bg: const Color(0xFFB91C1C), fg: Colors.white),
+                  if (g['urgency'] == 'high') const Pill('URGENT', bg: Color(0xFFFEE2E2), fg: Color(0xFFB91C1C)),
+                  if (g['is_abusive'] == true) const Pill('ABUSE', bg: Color(0xFFDC2626), fg: Colors.white),
+                  if (g['public_requested'] == true) Pill(g['public_approved'] == true ? 'PUBLIC' : 'PUBLIC?'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('${g['summary'] ?? g['description'] ?? ''}', maxLines: 3, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (c, box) {
+                  final cols = box.maxWidth > 420 ? 3 : 2;
+                  final w = (box.maxWidth - 8 * (cols - 1)) / cols;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final cell in [
+                        kv('Citizen', [g['name'], g['contact']].whereType<String>().join(' · ')),
+                        kv('Category', catLabel(g['category'] as String?)),
+                        kv(
+                          'Constituency',
+                          '${constituencyLabel(g['constituency'] as String?)}${g['ward_number'] != null ? ' · Ward ${g['ward_number']}' : ''}',
+                        ),
+                        kv('Filed', created == null ? '—' : Lang.instance.date(created)),
+                        kv(
+                          'Assigned to',
+                          assignee != null
+                              ? s.nameOf(assignee)
+                              : group != null
+                              ? 'Not picked yet · $group'
+                              : 'Unassigned',
+                        ),
+                        kv('Days pending', pendingLabel(g)),
+                      ])
+                        SizedBox(width: w, child: cell),
+                    ],
+                  );
+                },
+              ),
+              if (department != null) ...[
+                const SizedBox(height: 6),
+                Text('Department: $department', style: const TextStyle(fontSize: 12, color: Brand.muted)),
+              ],
+              if (repeat > 1) ...[
+                const SizedBox(height: 4),
+                Pill('×$repeat complaints by this citizen', bg: const Color(0xFFEDE9FE), fg: const Color(0xFF5B21B6)),
+              ],
             ],
-            if (repeat > 1) ...[
-              const SizedBox(height: 4),
-              Pill('×$repeat complaints by this citizen', bg: const Color(0xFFEDE9FE), fg: const Color(0xFF5B21B6)),
-            ],
-          ]),
+          ),
         ),
       ),
     );
@@ -445,6 +562,221 @@ class SourceBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(color: cc ? const Color(0xFFFFF7D6) : const Color(0xFFF4F4F5), borderRadius: BorderRadius.circular(4)),
       child: Text(cc ? 'CONTACT CENTER$by' : 'PUBLIC', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+/// Stage a case occupies on the board: an open case forwarded to a government
+/// department sits only in the department column (grievance-board.ts).
+String boardStage(Map g) {
+  final d = g['department_id'] as String?;
+  final status = (g['status'] as String?) ?? 'received';
+  return !isClosed(status) && d != null && d.isNotEmpty && d != defaultDepartment ? 'department' : status;
+}
+
+/// Board column order: the department column sits just before Resolved.
+List<String> get boardStages => [
+  for (final s in statuses.keys) ...[if (s == 'resolved') 'department', s],
+];
+
+/// "Board by stage" from admin.index.tsx BoardView. Phones snap one column at a
+/// time; tablets and foldables show several fixed-width columns.
+class StageBoard extends StatefulWidget {
+  const StageBoard({super.key, required this.rows, required this.departments, required this.onOpen});
+  final List<DbRow> rows;
+  final List<Department> departments;
+  final ValueChanged<String> onOpen;
+  static const limit = 60;
+  @override
+  State<StageBoard> createState() => _StageBoardState();
+}
+
+class _StageBoardState extends State<StageBoard> {
+  final _pages = PageController(viewportFraction: 0.86);
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final byStage = <String, List<DbRow>>{for (final s in boardStages) s: []};
+    for (final g in widget.rows) {
+      byStage[boardStage(g)]?.add(g);
+    }
+    final deptNames = {for (final d in widget.departments) d.id: d.name};
+    Widget column(String stage) => _StageColumn(stage: stage, rows: byStage[stage]!, deptNames: deptNames, onOpen: widget.onOpen);
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (box.maxWidth < 600) {
+          return PageView(
+            controller: _pages,
+            padEnds: false,
+            children: [for (final s in boardStages) Padding(padding: const EdgeInsets.only(right: 10), child: column(s))],
+          );
+        }
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: boardStages.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (_, i) => SizedBox(width: 300, child: column(boardStages[i])),
+        );
+      },
+    );
+  }
+}
+
+class _StageColumn extends StatelessWidget {
+  const _StageColumn({required this.stage, required this.rows, required this.deptNames, required this.onOpen});
+  final String stage;
+  final List<DbRow> rows;
+  final Map<String, String> deptNames;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final dept = stage == 'department';
+    final shown = rows.take(StageBoard.limit).toList();
+    final more = rows.length - shown.length;
+    return Container(
+      decoration: BoxDecoration(
+        color: dept ? Brand.red.withValues(alpha: 0.04) : const Color(0xFFF4F4F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: dept ? Brand.red.withValues(alpha: 0.3) : Brand.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: dept ? Pill('With department', bg: Brand.red.withValues(alpha: 0.12), fg: Brand.red) : StatusPill(stage),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${rows.length}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: Brand.muted),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                if (rows.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      dept ? 'No open cases forwarded to a department' : 'No cases',
+                      style: const TextStyle(fontSize: 12, color: Brand.muted),
+                    ),
+                  ),
+                for (final g in shown)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BoardCard(
+                      g: g,
+                      department: dept ? deptNames[g['department_id']] ?? 'Department' : null,
+                      onTap: () => onOpen('${g['id']}'),
+                    ),
+                  ),
+                if (more > 0)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      '+$more more — narrow the filters or use List view',
+                      style: const TextStyle(fontSize: 12, color: Brand.muted),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoardCard extends StatelessWidget {
+  const _BoardCard({required this.g, required this.onTap, this.department});
+  final DbRow g;
+  final VoidCallback onTap;
+  final String? department;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = !isClosed(g['status'] as String?);
+    final critical = g['priority_level'] == 'critical';
+    final assignee = g['assigned_to'] as String?;
+    const small = TextStyle(fontSize: 12, color: Brand.muted);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(left: critical ? const BorderSide(color: Brand.red, width: 4) : BorderSide.none),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 8,
+                children: [
+                  Text(
+                    '${g['reference_code']}',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Brand.muted),
+                  ),
+                  Text(
+                    pendingLabel(g),
+                    style: open && pendingDays(g) >= 7
+                        ? const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Brand.red)
+                        : const TextStyle(fontSize: 11, color: Brand.muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${g['summary'] ?? g['description'] ?? ''}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${catLabel(g['category'] as String?)}${g['constituency'] != null ? ' · ${g['constituency']}' : ''}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: small,
+              ),
+              if (department != null)
+                Text(
+                  department!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Brand.red),
+                ),
+              Text(
+                assignee != null ? StaffSession.instance.nameOf(assignee) : 'Unassigned',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: assignee != null ? const TextStyle(fontSize: 12) : small.copyWith(fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
