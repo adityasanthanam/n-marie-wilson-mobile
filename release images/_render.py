@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Store preview images for the Office of Dr. N. Marie Wilson app."""
+"""Store preview images for the NMW Connect app."""
 
 from __future__ import annotations
 
@@ -8,9 +8,12 @@ import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+APP_ICON = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/assets/branding/app_icon.png"
 PORTRAIT = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/assets/images/marie-wilson-portrait.jpg"
+TVK_BADGE = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/assets/images/tvk-badge.png"
 OUTFIT = "/tmp/mw-fonts/outfit-test.ttf"
 TAMIL = "/tmp/mw-fonts/NotoSansTamil.ttf"
+BEBAS = "/Users/entrans/project/tvk_proj/n-marie-wilson-mobile/tool/fonts/BebasNeue-Regular.ttf"
 
 INK = (32, 14, 8)
 RED = (176, 16, 24)
@@ -494,7 +497,77 @@ def screen_news(platform: str) -> Image.Image:
     return ui.img
 
 
+def screen_home(platform: str) -> Image.Image:
+    ui = UI()
+    labels, kinds = EN_NAV
+    status_bar(ui, platform)
+    bottom_nav(ui, labels, kinds, 0)
+    # App bar: badge + NMW Connect + Tamil toggle
+    badge = Image.open(TVK_BADGE).convert("RGBA").resize((ui.p(28), ui.p(28)), Image.Resampling.LANCZOS)
+    mask = Image.new("L", badge.size, 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, badge.size[0] - 1, badge.size[1] - 1), fill=255)
+    ui.img.paste(badge, (ui.p(16), ui.p(64)), mask)
+    ui.text(52, 78, "NMW Connect", "en", 17, 650, INK, anchor="lm")
+    lang_w = ui.width("தமிழ்", "ta", 14, 700)
+    ui.text(374 - lang_w, 78, "தமிழ்", "ta", 14, 700, BRAND, anchor="lm")
+    ui.line((0, 100), (390, 100), (244, 244, 245), 1)
+
+    # Hero
+    ui.img.paste(Image.new("RGB", (ui.p(390), ui.p(658)), CREAM), (0, ui.p(101)))
+    ui.text(16, 122, "Your concern.", "en", 26, 800, INK)
+    ui.text(16, 154, "The Minister's", "en", 26, 800, BRAND)
+    ui.text(16, 186, "commitment.", "en", 26, 800, BRAND)
+    ui.paragraph(
+        16,
+        228,
+        "As Minister for Finance, Pensions and Planning in the TVK government led by Hon'ble Chief Minister C. Joseph Vijay, Dr. N. Marie Wilson carries your complaint straight to the officer who can act on it — and follows it through to the end.",
+        "en",
+        13,
+        450,
+        MUTED,
+        358,
+        leading=1.38,
+    )
+    ui.rrect((16, 348, 374, 420), 16, fill=BRAND)
+    ui.text(32, 366, "IMMEDIATE ACTION", "en", 10, 700, (255, 255, 255))
+    ui.text(32, 390, "New grievance", "en", 18, 800, WHITE)
+    ui.icon("chevron", 352, 384, 16, WHITE)
+    ui.rrect((16, 434, 187, 482), 14, fill=WHITE, outline=(212, 212, 216), width=1.3)
+    ui.icon("search", 40, 458, 16, INK)
+    ui.text(56, 458, "Track", "en", 14, 600, INK, anchor="lm")
+    ui.rrect((203, 434, 374, 482), 14, fill=WHITE, outline=(212, 212, 216), width=1.3)
+    ui.icon("chat", 227, 458, 16, INK)
+    ui.text(243, 458, "Ask the assistant", "en", 12.5, 600, INK, anchor="lm")
+
+    chips = [
+        (16, "Straight to the Minister's desk"),
+        (16, "Answers in English & Tamil"),
+        (None, "Tracked in real time"),
+    ]
+    y = 500
+    x = 16
+    chip_face_size = 11
+    for i, (_, label) in enumerate(chips):
+        tw = ui.width(label, "en", chip_face_size, 550)
+        w = tw + 28
+        if x + w > 374:
+            x = 16
+            y += 32
+        ui.rrect((x, y, x + w, y + 26), 13, fill=WHITE)
+        ui.text(x + 12, y + 13, label, "en", chip_face_size, 550, (55, 55, 60), anchor="lm")
+        x += w + 8
+
+    photo_w, photo_h = 358, 210
+    photo_y = 568
+    photo = ImageOps.fit(Image.open(PORTRAIT).convert("RGB"), (ui.p(photo_w), ui.p(photo_h)), Image.Resampling.LANCZOS, centering=(0.5, 0.28))
+    pmask = Image.new("L", photo.size, 0)
+    ImageDraw.Draw(pmask).rounded_rectangle((0, 0, photo.size[0] - 1, photo.size[1] - 1), radius=ui.p(16), fill=255)
+    ui.img.paste(photo, (ui.p(16), ui.p(photo_y)), pmask)
+    return ui.img
+
+
 SCREENS = {
+    "home": screen_home,
     "about": screen_about,
     "file": screen_file,
     "track": screen_track,
@@ -503,7 +576,7 @@ SCREENS = {
 }
 
 STORIES = [
-    ("01-know-your-representative", "about", "Know Your", "Representative", "Profile, public service, and constituency information in one place."),
+    ("01-know-your-representative", "home", "Your Concern.", "Followed Through", "File a grievance, track it, and follow it through — in Tamil or English."),
     ("02-file-a-grievance", "file", "File a", "Grievance", "Raise your concern with ease and reach the office directly."),
     ("03-track-grievance-status", "track", "Track Grievance", "Status", "Check the latest update and progress on your grievance."),
     ("04-ai-assistant", "more", "Get Help from", "the AI Assistant", "Ask questions and get instant support in Tamil or English."),
@@ -754,10 +827,16 @@ def search_results_asset() -> Image.Image:
     return im.convert("RGB")
 
 
+def _rounded_icon(size: int, radius: int) -> tuple[Image.Image, Image.Image]:
+    icon = ImageOps.fit(Image.open(APP_ICON).convert("RGB"), (size, size), Image.Resampling.LANCZOS)
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
+    return icon, mask
+
+
 def feature_graphic() -> Image.Image:
     w, h = 1024, 500
     im = Image.new("RGBA", (w, h), (*CREAM, 255))
-    d = ImageDraw.Draw(im)
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
     od.ellipse((620, -180, 1280, 680), fill=(168, 14, 24, 255))
@@ -765,15 +844,15 @@ def feature_graphic() -> Image.Image:
     od.ellipse((-80, -160, 420, 220), fill=(255, 214, 204, 160))
     im.alpha_composite(overlay)
     d = ImageDraw.Draw(im)
-    kicker = mfont(OUTFIT, 22, 700)
-    d.text((56, 78), "RADHAKRISHNAN NAGAR", font=kicker, fill=BRAND)
-    title = mfont(OUTFIT, 64, 780)
-    d.text((56, 112), "Know your", font=title, fill=INK)
-    d.text((56, 176), "representative", font=title, fill=RED_DEEP)
-    d.rounded_rectangle((56, 262, 148, 270), radius=4, fill=BRAND)
+    kicker = mfont(OUTFIT, 20, 700)
+    d.text((56, 72), "CIVIC HELPDESK", font=kicker, fill=BRAND)
+    title = ImageFont.truetype(BEBAS, 92)
+    d.text((56, 96), "NMW", font=title, fill=INK)
+    d.text((56, 178), "CONNECT", font=title, fill=RED_DEEP)
+    d.rounded_rectangle((56, 268, 148, 276), radius=4, fill=BRAND)
     sub = mfont(OUTFIT, 24, 460)
-    d.text((56, 294), "File a grievance, track it, and reach", font=sub, fill=(78, 62, 56))
-    d.text((56, 328), "the office — in Tamil or English.", font=sub, fill=(78, 62, 56))
+    d.text((56, 300), "File a grievance, track it, and follow", font=sub, fill=(78, 62, 56))
+    d.text((56, 334), "local issues — in Tamil or English.", font=sub, fill=(78, 62, 56))
     pills = ["File", "Track", "Assistant", "News"]
     x = 56
     pf = mfont(OUTFIT, 18, 650)
@@ -782,10 +861,14 @@ def feature_graphic() -> Image.Image:
         d.rounded_rectangle((x, 392, x + tw + 36, 432), radius=20, fill=WHITE)
         d.text((x + 18, 412), pill, font=pf, fill=RED_DEEP, anchor="lm")
         x += tw + 48
-    photo = ImageOps.fit(Image.open(PORTRAIT).convert("RGB"), (300, 380), Image.Resampling.LANCZOS, centering=(0.5, 0.28))
-    mask = Image.new("L", photo.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, 299, 379), radius=28, fill=255)
-    im.paste(photo, (680, 60), mask)
+    size = 288
+    icon, mask = _rounded_icon(size, 64)
+    ix, iy = 680, (h - size) // 2
+    shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle((ix + 10, iy + 16, ix + size - 2, iy + size + 8), radius=64, fill=(40, 4, 8, 90))
+    im.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14)))
+    im.paste(icon, (ix, iy), mask)
     return im.convert("RGB")
 
 

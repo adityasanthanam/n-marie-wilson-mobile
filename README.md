@@ -1,4 +1,4 @@
-# N. Marie Wilson — Mobile App
+# NMW Connect — Mobile App
 
 Flutter app for iOS and Android, built to match the web portal
 ([n-marie-wilson-connect](https://github.com/adityasanthanam/n-marie-wilson-connect)).
