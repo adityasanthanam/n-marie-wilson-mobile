@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""Generate NMW Connect launcher icons from the TVK badge plus the civic grievance mark."""
+"""Generate NMW Connect icons from the civic grievance mark only.
+
+The Play hi-res icon must not show a party emblem, flag, or portrait.
+The grievance card and pin are the app's own mark.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "branding"
-BADGE = ROOT / "assets" / "branding" / "tvk-badge-hires.png"
-FONT = ROOT / "tool" / "fonts" / "BebasNeue-Regular.ttf"
+# One column of the original icon red, and the original "NMW Connect" letters.
+# The letters stay pixel-for-pixel. Only the emblem above them is redrawn.
+GRADIENT_COLUMN = OUT / "icon_red_column.png"
+WORDMARK_STRIP = OUT / "nmw_wordmark_strip.png"
+WORDMARK_TOP = 714  # y on the 1024 master where the original wordmark begins
 
-RED_TOP = (200, 32, 32)
-RED_BOT = (122, 18, 18)
 RED_HEADER = (220, 38, 38)
 CREAM = (253, 249, 242)
 LINE = (196, 70, 54)
@@ -22,37 +27,8 @@ GOLD_DEEP = (180, 110, 12)
 WHITE = (255, 255, 255)
 
 
-def lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))  # type: ignore[return-value]
-
-
-def vertical_gradient(size: int, top: tuple[int, int, int], bot: tuple[int, int, int]) -> Image.Image:
-    strip = Image.new("RGB", (1, size))
-    px = strip.load()
-    last = size - 1
-    for y in range(size):
-        px[0, y] = lerp(top, bot, y / last)
-    return strip.resize((size, size), Image.Resampling.BILINEAR)
-
-
 def rr(draw: ImageDraw.ImageDraw, xy: tuple[float, float, float, float], radius: float, fill) -> None:
     draw.rounded_rectangle(xy, radius=radius, fill=fill)
-
-
-def display_font(px: int) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(str(FONT), px)
-
-
-def circularize(im: Image.Image) -> Image.Image:
-    im = im.convert("RGBA")
-    size = min(im.size)
-    im = im.resize((size, size), Image.Resampling.LANCZOS)
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse((1, 1, size - 2, size - 2), fill=255)
-    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    out.paste(im, (0, 0))
-    out.putalpha(mask)
-    return out
 
 
 def draw_pin(layer: Image.Image, cx: float, top: float, height: float) -> None:
@@ -120,53 +96,37 @@ def civic_mark(size: int) -> Image.Image:
     return Image.alpha_composite(img, pin)
 
 
-def draw_icon(size: int, scale: float, background: Image.Image | None, wordmark: bool) -> Image.Image:
-    img = background.convert("RGBA") if background is not None else Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    cx = size / 2
-    badge_d = int(size * scale * (0.58 if wordmark else 0.70))
-    badge_y = int(size * (0.12 if wordmark else 0.15))
-    if not wordmark:
-        badge_y = int((size - badge_d) / 2 - size * 0.02)
+def place_mark(canvas: Image.Image, mark: Image.Image, origin: tuple[int, int]) -> Image.Image:
+    """Drop the civic mark onto the canvas with a soft shadow under the card."""
+    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    alpha = mark.getchannel("A")
+    tint = Image.new("RGBA", mark.size, (0, 0, 0, 110))
+    tint.putalpha(alpha)
+    shift = max(int(canvas.size[0] * 0.012), 4)
+    shadow.alpha_composite(tint, (origin[0] + shift, origin[1] + shift))
+    canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(radius=max(canvas.size[0] * 0.018, 1))))
+    canvas.alpha_composite(mark, origin)
+    return canvas
 
-    badge = circularize(Image.open(BADGE)).resize((badge_d, badge_d), Image.Resampling.LANCZOS)
-    # Gold ring
-    ring = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    rd = ImageDraw.Draw(ring)
-    pad = max(int(badge_d * 0.035), 8)
-    box = (cx - badge_d / 2 - pad, badge_y - pad, cx + badge_d / 2 + pad, badge_y + badge_d + pad)
-    rd.ellipse(box, outline=GOLD + (255,), width=max(int(size * 0.012), 6))
-    rd.ellipse(
-        (box[0] + pad * 0.35, box[1] + pad * 0.35, box[2] - pad * 0.35, box[3] - pad * 0.35),
-        outline=(180, 20, 20, 255),
-        width=max(int(size * 0.006), 3),
-    )
-    img = Image.alpha_composite(img, ring)
 
-    shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.ellipse(
-        (cx - badge_d / 2 + 12, badge_y + 18, cx + badge_d / 2 + 12, badge_y + badge_d + 18),
-        fill=(0, 0, 0, 70),
-    )
-    img = Image.alpha_composite(img, shadow.filter(ImageFilter.GaussianBlur(radius=max(size * 0.02, 1))))
+def original_background(size: int) -> Image.Image:
+    column = Image.open(GRADIENT_COLUMN).convert("RGB")
+    return column.resize((size, size), Image.Resampling.NEAREST).convert("RGBA")
 
-    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    layer.paste(badge, (int(cx - badge_d / 2), badge_y), badge)
-    img = Image.alpha_composite(img, layer)
 
-    overlay_d = int(badge_d * 0.38)
-    civic = civic_mark(overlay_d)
-    ox = int(cx + badge_d * 0.18)
-    oy = int(badge_y + badge_d * 0.62)
-    img.alpha_composite(civic, (ox, oy))
-
-    if wordmark:
-        draw = ImageDraw.Draw(img)
-        nmw = display_font(int(size * 0.145))
-        conn = display_font(int(size * 0.072))
-        ty = badge_y + badge_d + int(size * 0.028)
-        draw.text((cx, ty), "NMW", font=nmw, fill=CREAM, anchor="mt")
-        draw.text((cx, ty + int(size * 0.13)), "CONNECT", font=conn, fill=GOLD, anchor="mt")
+def draw_icon(size: int) -> Image.Image:
+    """Civic card on the original red, with the original NMW Connect wordmark locked below it."""
+    if size != 1024:
+        raise ValueError("master icon is 1024 so the wordmark strip stays the original size")
+    img = original_background(size)
+    mark_d = int(size * 0.70)
+    mark = civic_mark(mark_d)
+    top = int(size * 0.025)
+    img = place_mark(img, mark, ((size - mark_d) // 2, top))
+    strip = Image.open(WORDMARK_STRIP).convert("RGBA")
+    if strip.size != (size, size - WORDMARK_TOP):
+        raise ValueError(f"wordmark strip is {strip.size}, expected {(size, size - WORDMARK_TOP)}")
+    img.alpha_composite(strip, (0, WORDMARK_TOP))
     return img
 
 
@@ -181,19 +141,19 @@ def save_rgba(img: Image.Image, path: Path) -> None:
 
 
 def main() -> None:
-    src = 2048
-    bg = vertical_gradient(src, RED_TOP, RED_BOT)
-    ios = draw_icon(src, 0.92, bg, wordmark=True).resize((1024, 1024), Image.Resampling.LANCZOS)
-    android = draw_icon(src, 0.78, bg, wordmark=False).resize((1024, 1024), Image.Resampling.LANCZOS)
-    foreground = draw_icon(src, 0.78, None, wordmark=False).resize((1024, 1024), Image.Resampling.LANCZOS)
+    if not GRADIENT_COLUMN.is_file() or not WORDMARK_STRIP.is_file():
+        raise SystemExit("missing original wordmark assets in assets/branding")
+    listed = draw_icon(1024)
+    play = listed.resize((512, 512), Image.Resampling.LANCZOS)
 
-    save_rgb(ios, OUT / "app_icon.png")
-    save_rgb(ios, OUT / "app_icon_ios.png")
-    save_rgb(android, OUT / "app_icon_android.png")
-    save_rgba(foreground, OUT / "app_icon_android_foreground.png")
-    save_rgba(foreground, OUT / "app_icon_foreground.png")
-    save_rgba(foreground, OUT / "splash_logo.png")
-    save_rgb(ios.resize((512, 512), Image.Resampling.LANCZOS), OUT / "play_store_icon.png")
+    save_rgb(listed, OUT / "app_icon.png")
+    save_rgb(listed, OUT / "app_icon_ios.png")
+    save_rgb(listed, OUT / "app_icon_android.png")
+    save_rgb(listed, OUT / "nmw_connect_app_icon.png")
+    save_rgba(listed, OUT / "app_icon_android_foreground.png")
+    save_rgba(listed, OUT / "app_icon_foreground.png")
+    save_rgba(listed, OUT / "splash_logo.png")
+    save_rgb(play, OUT / "play_store_icon.png")
 
 
 if __name__ == "__main__":
