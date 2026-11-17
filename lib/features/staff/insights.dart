@@ -26,7 +26,45 @@ const insightCategories = [
 const insightWeeks = 4;
 
 const insightMethodology =
-    'Growth is the average of week-on-week changes across the last 4 completed Indian Monday–Sunday weeks; weeks following a zero baseline are skipped. Last week means the last completed week, and week before means the preceding completed week. Overall department counts have no filing-date cutoff. A response means a recorded status update after the latest department handoff; pending means no such update. Department ownership records a handoff, not delivery of an external message.';
+    'Growth is the average of week-on-week changes across the last 4 completed Indian Monday–Sunday weeks; weeks following a zero baseline are skipped. Last week means the last completed week, and week before means the preceding completed week. Overall department counts have no filing-date cutoff. A response means a recorded status update after the latest department handoff; pending means no such update. Department ownership records a handoff, not delivery of an external message. Assessment is Good only if reports are not rising, at least 75% of department issues have a response, and average response and pending ages are 3 days or less.';
+
+/// A report is Good only when every standard passes; trend alone never decides it.
+const insightStandards = (minResponseRate: 75, maxAvgPendingDays: 3, maxAvgResponseDays: 3);
+
+/// assessInsight from daily-insights.ts: every failed standard is listed.
+({String assessment, List<String> reasons}) assessInsight({
+  required double? changePercent,
+  required int departmentForwarded,
+  required int departmentResponded,
+  required double? avgResponseDays,
+  required double? avgPendingDays,
+}) {
+  const st = insightStandards;
+  final reasons = <String>[];
+  if (changePercent != null && changePercent > 0) reasons.add('Reports are rising (average +${jsNum(changePercent)}% per week).');
+  if (departmentForwarded > 0) {
+    final rate = _jsRound(departmentResponded / departmentForwarded * 100).toInt();
+    if (rate < st.minResponseRate) {
+      reasons.add(
+        'Departments responded to only $rate% of issues ($departmentResponded of $departmentForwarded); target is ${st.minResponseRate}%.',
+      );
+    }
+  }
+  if (avgPendingDays != null && avgPendingDays > st.maxAvgPendingDays) {
+    reasons.add(
+      'Pending issues have waited ${jsNum(avgPendingDays)} days on average without a response; target is ${st.maxAvgPendingDays} days or less.',
+    );
+  }
+  if (avgResponseDays != null && avgResponseDays > st.maxAvgResponseDays) {
+    reasons.add('Departments took ${jsNum(avgResponseDays)} days on average to respond; target is ${st.maxAvgResponseDays} days or less.');
+  }
+  return (
+    assessment: reasons.isEmpty ? 'good' : 'attention',
+    reasons: reasons.isEmpty ? const ['Reports are not rising, and departments are responding on time.'] : reasons,
+  );
+}
+
+typedef DepartmentSplit = ({String departmentId, int forwarded, int responded, int pending});
 
 const _day = 86400000;
 const _istOffset = 19800000; // +05:30
@@ -64,6 +102,8 @@ class DailyInsight {
     required this.lastWeekChangePercent,
     required this.weeklyCounts,
     required this.assessment,
+    required this.assessmentReasons,
+    required this.departmentBreakdown,
     required this.summary,
     required this.currentReceivedIds,
     required this.previousReceivedIds,
@@ -75,6 +115,12 @@ class DailyInsight {
   final int currentReceived, previousReceived, departmentForwarded, departmentResponded, departmentPending;
   final double? avgResponseDays, avgPendingDays, changePercent, lastWeekChangePercent;
   final List<({String weekStart, int count})> weeklyCounts;
+
+  /// Plain-language reasons; every failed standard is listed.
+  final List<String> assessmentReasons;
+
+  /// Per-department split of forwarded issues, most forwarded first.
+  final List<DepartmentSplit> departmentBreakdown;
   final List<String> currentReceivedIds, previousReceivedIds, departmentForwardedIds, departmentRespondedIds, departmentPendingIds;
 
   bool get good => assessment == 'good';
@@ -87,6 +133,7 @@ class DailyInsight {
     summary,
     'Average week-on-week growth (last $insightWeeks completed weeks): ${changePercent == null ? 'not measurable yet' : '${changePercent! > 0 ? '+' : ''}${jsNum(changePercent!)}%'}. Last week: $currentReceived; week before: $previousReceived.',
     'Overall department follow-up: $departmentForwarded reported; $departmentResponded responses recorded; $departmentPending pending with departments. Average age at response: ${avgResponseDays == null ? '—' : jsNum(avgResponseDays!)} days; average age of pending: ${avgPendingDays == null ? '—' : jsNum(avgPendingDays!)} days.',
+    'Assessment: ${good ? 'Good' : 'Needs attention'}. ${assessmentReasons.join(' ')}',
   ].join('\n\n');
 }
 
@@ -163,7 +210,33 @@ InsightReport buildDailyInsights(List<Map> rows, List<Map> history, [DateTime? a
             : currentReceived == 0
             ? 0
             : null;
-        final assessment = (changePercent ?? 1) <= 0 ? 'good' : 'attention';
+        final assessed = assessInsight(
+          changePercent: changePercent,
+          departmentForwarded: forwarded.length,
+          departmentResponded: responded.length,
+          avgResponseDays: avgResponseDays,
+          avgPendingDays: avgPendingDays,
+        );
+        final byDept = <String, ({int forwarded, int responded, int pending})>{};
+        for (final r in forwarded) {
+          final id = r['department_id'] as String;
+          final d = byDept[id] ?? (forwarded: 0, responded: 0, pending: 0);
+          final hit = respondedSet.contains('${r['id']}');
+          byDept[id] = (forwarded: d.forwarded + 1, responded: d.responded + (hit ? 1 : 0), pending: d.pending + (hit ? 0 : 1));
+        }
+        // Stable like JavaScript's sort: ties keep first-seen order.
+        final order = {for (final (i, k) in byDept.keys.indexed) k: i};
+        final departmentBreakdown =
+            [
+              for (final e in byDept.entries)
+                (departmentId: e.key, forwarded: e.value.forwarded, responded: e.value.responded, pending: e.value.pending),
+            ]..sort(
+              (a, b) => a.forwarded != b.forwarded
+                  ? b.forwarded - a.forwarded
+                  : a.pending != b.pending
+                  ? b.pending - a.pending
+                  : order[a.departmentId]! - order[b.departmentId]!,
+            );
         final series = weeklyCounts.map((w) => w.count).join(' → ');
         final trend = changePercent == null
             ? '$label average week-on-week growth is not measurable yet because earlier weeks had zero reports. Weekly reports over the last $insightWeeks weeks: $series.'
@@ -191,7 +264,9 @@ InsightReport buildDailyInsights(List<Map> rows, List<Map> history, [DateTime? a
           changePercent: changePercent,
           lastWeekChangePercent: lastWeekChangePercent,
           weeklyCounts: weeklyCounts,
-          assessment: assessment,
+          assessment: assessed.assessment,
+          assessmentReasons: assessed.reasons,
+          departmentBreakdown: departmentBreakdown,
           summary: '$trend $department',
           currentReceivedIds: currentReceivedIds,
           previousReceivedIds: previousReceivedIds,
@@ -347,7 +422,13 @@ class _InsightCardState extends State<InsightCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            for (final r in i.assessmentReasons)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $r', style: TextStyle(fontSize: 12, color: i.good ? Brand.muted : Brand.red)),
+              ),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
