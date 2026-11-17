@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -126,6 +127,13 @@ class Api {
     final data = (_decode(r) as Map)['data'];
     if (data is Map && data['ok'] == false) throw ApiException(400, '${data['error'] ?? 'Request failed'}');
     return data;
+  }
+
+  /// Binary staff GET (e.g. insights/{category}/pdf). Errors still arrive as JSON.
+  Future<Uint8List> staffBytes(String path, {Map<String, String>? query}) async {
+    final r = await _http.get(_gw('/staff/$path', query), headers: _bearer());
+    if (r.statusCode >= 400) _decode(r);
+    return r.bodyBytes;
   }
 
   /// Records a request for an admin to reset the password; always succeeds.
