@@ -39,6 +39,12 @@
    "chip2": "Answers in English & Tamil",
    "chip3": "Tracked in real time"
   },
+  "homeGallery": {
+   "tag": "With the Chief Minister",
+   "title": "Working alongside Hon'ble Chief Minister C. Joseph Vijay.",
+   "caption1": "With Hon'ble Chief Minister C. Joseph Vijay at the Chief Minister's office.",
+   "caption2": "A warm meeting with Hon'ble Chief Minister C. Joseph Vijay."
+  },
   "homeSummary": {
    "initiatives": {
     "tag": "Initiatives & Leadership",
@@ -273,6 +279,12 @@
    "chip1": "நேரடியாக அமைச்சர் அலுவலகத்திற்கு",
    "chip2": "தமிழ் & ஆங்கிலத்தில் பதில்கள்",
    "chip3": "நிகழ்நேரக் கண்காணிப்பு"
+  },
+  "homeGallery": {
+   "tag": "முதலமைச்சருடன்",
+   "title": "மாண்புமிகு முதலமைச்சர் ச. ஜோசப் விஜய் அவர்களுடன் இணைந்து பணியாற்றுதல்.",
+   "caption1": "முதலமைச்சர் அலுவலகத்தில் மாண்புமிகு முதலமைச்சர் ச. ஜோசப் விஜய் அவர்களுடன்.",
+   "caption2": "மாண்புமிகு முதலமைச்சர் ச. ஜோசப் விஜய் அவர்களுடன் அன்பான சந்திப்பு."
   },
   "homeSummary": {
    "initiatives": {

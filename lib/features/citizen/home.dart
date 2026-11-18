@@ -96,6 +96,7 @@ class HomeScreen extends StatelessWidget {
                 : Column(children: [heroText, const SizedBox(height: 20), SizedBox(width: 280, child: portrait)]),
           ),
         ),
+        const CabinetSection(),
         Padding(
           padding: const EdgeInsets.all(16),
           child: MaxWidth(
@@ -103,7 +104,6 @@ class HomeScreen extends StatelessWidget {
             child: ResponsiveGrid(minItemWidth: 300, children: [
               _Summary('homeSummary.initiatives', Icons.apartment, '/more/initiatives'),
               _Summary('homeSummary.constituency', Icons.place_outlined, '/more/constituency'),
-              _Summary('homeSummary.ministry', Icons.account_balance, '/more/ministry'),
             ]),
           ),
         ),
@@ -111,6 +111,164 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: MaxWidth(width: 1100, child: _Flagship()),
         ),
+      ]),
+    );
+  }
+}
+
+/// Cabinet portfolio with the Chief Minister photographs, as on the web homepage.
+class CabinetSection extends StatelessWidget {
+  const CabinetSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = !context.isCompact;
+    final info = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Image.asset('assets/images/tn-emblem.png', width: 56, height: 56),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t('homeSummary.ministry.tag'), style: const TextStyle(color: Brand.red, fontWeight: FontWeight.w700)),
+            Text(t('common.governmentOfTN'), style: const TextStyle(fontSize: 12, color: Brand.muted)),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: 14),
+      Text(t('homeSummary.ministry.title'),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.2)),
+      const SizedBox(height: 10),
+      Text(t('homeSummary.ministry.body'), style: const TextStyle(color: Color(0xFF52525B), height: 1.5)),
+      const SizedBox(height: 14),
+      const Divider(height: 1),
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Wrap(spacing: 16, runSpacing: 8, children: [
+          _Portfolio(Icons.payments_outlined, t('ministry.finance.tag')),
+          _Portfolio(Icons.verified_user_outlined, t('ministry.pensions.tag')),
+          _Portfolio(Icons.show_chart, t('ministry.planning.tag')),
+        ]),
+      ),
+      const Divider(height: 1),
+      const SizedBox(height: 4),
+      TextButton(
+        style: TextButton.styleFrom(padding: EdgeInsets.zero),
+        onPressed: () => context.go('/more/ministry'),
+        child: Text('${t('homeSummary.ministry.cta')} →'),
+      ),
+    ]);
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F7F8),
+        border: Border.symmetric(horizontal: BorderSide(color: Color(0xFFE4E4E7))),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      child: MaxWidth(
+        width: 1100,
+        child: wide
+            ? Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Expanded(child: info),
+                const SizedBox(width: 32),
+                const Expanded(child: PhotoCarousel()),
+              ])
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [info, const SizedBox(height: 20), const PhotoCarousel()]),
+      ),
+    );
+  }
+}
+
+class _Portfolio extends StatelessWidget {
+  const _Portfolio(this.icon, this.label);
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 16, color: Brand.red),
+        const SizedBox(width: 6),
+        Flexible(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+      ]);
+}
+
+/// Looping photo carousel with captions, previous/next buttons and a "01 / 02" counter.
+class PhotoCarousel extends StatefulWidget {
+  const PhotoCarousel({super.key});
+  static const photos = [
+    ('assets/images/cm-meeting-office.jpg', 'homeGallery.caption1'),
+    ('assets/images/cm-meeting-bouquet.jpg', 'homeGallery.caption2'),
+  ];
+  @override
+  State<PhotoCarousel> createState() => _PhotoCarouselState();
+}
+
+class _PhotoCarouselState extends State<PhotoCarousel> {
+  // Starts far from 0 so swiping back from the first photo loops to the last.
+  static const _start = 1000;
+  final _pager = PageController(initialPage: _start);
+  int _page = _start;
+
+  int get _index => _page % PhotoCarousel.photos.length;
+
+  @override
+  void dispose() {
+    _pager.dispose();
+    super.dispose();
+  }
+
+  void _go(int delta) =>
+      _pager.animateToPage(_page + delta, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+
+  @override
+  Widget build(BuildContext context) {
+    final n = PhotoCarousel.photos.length;
+    final ta = LangScope.of(context).ta;
+    final caption = t(PhotoCarousel.photos[_index].$2);
+    return Semantics(
+      label: ta ? 'அமைச்சரவைப் பொறுப்பு புகைப்படங்கள்' : 'Cabinet portfolio photographs',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: ColoredBox(
+              color: const Color(0xFFF4F4F5),
+              child: PageView.builder(
+                controller: _pager,
+                onPageChanged: (p) => setState(() => _page = p),
+                itemBuilder: (context, p) {
+                  final photo = PhotoCarousel.photos[p % n];
+                  return Image.asset(photo.$1, fit: BoxFit.contain, semanticLabel: t(photo.$2));
+                },
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 40),
+            child: Text(caption, style: const TextStyle(fontSize: 13, color: Brand.muted, height: 1.5)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(children: [
+          IconButton.outlined(
+            tooltip: ta ? 'முந்தைய புகைப்படம்' : 'Previous photograph',
+            icon: const Icon(Icons.arrow_back, size: 18),
+            onPressed: () => _go(-1),
+          ),
+          const SizedBox(width: 4),
+          IconButton.outlined(
+            tooltip: ta ? 'அடுத்த புகைப்படம்' : 'Next photograph',
+            icon: const Icon(Icons.arrow_forward, size: 18),
+            onPressed: () => _go(1),
+          ),
+          const SizedBox(width: 10),
+          Semantics(
+            liveRegion: true,
+            child: Text('${'${_index + 1}'.padLeft(2, '0')} / ${'$n'.padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 12, color: Brand.muted, fontFeatures: [FontFeature.tabularFigures()])),
+          ),
+        ]),
       ]),
     );
   }
