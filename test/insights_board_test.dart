@@ -55,8 +55,43 @@ void main() {
       expect((i.departmentForwarded, i.departmentResponded, i.departmentPending), (3, 1, 2));
       expect(i.departmentRespondedIds, ['answered']);
       expect(i.departmentPendingIds, ['pending', 'before-handoff']);
+      expect(i.departmentBreakdown, [(departmentId: 'electricity_board', forwarded: 3, responded: 1, pending: 2)]);
       expect(i.summary, contains('Overall, 3 issues have been reported to departments.'));
       expect(i.summary, isNot(matches(RegExp('closed|closures', caseSensitive: false))));
+    });
+
+    test('needs attention when trend falls but department follow-up is poor (61 forwarded, 29 responded, 7.9 days pending)', () {
+      final r = assessInsight(changePercent: -7.6, departmentForwarded: 61, departmentResponded: 29, avgResponseDays: 2, avgPendingDays: 7.9);
+      expect(r.assessment, 'attention');
+      expect(r.reasons.join(' '), contains('48%'));
+      expect(r.reasons.join(' '), contains('7.9 days'));
+    });
+
+    test('is good only when trend, response rate and ages all pass', () {
+      expect(assessInsight(changePercent: -5, departmentForwarded: 10, departmentResponded: 8, avgResponseDays: 2, avgPendingDays: 3).assessment, 'good');
+      expect(assessInsight(changePercent: -5, departmentForwarded: 10, departmentResponded: 8, avgResponseDays: 4, avgPendingDays: 1).assessment, 'attention');
+    });
+
+    test('lists every failed standard in the web wording and adds it to the share text', () {
+      final r = assessInsight(changePercent: 12.5, departmentForwarded: 4, departmentResponded: 1, avgResponseDays: 3.5, avgPendingDays: 6);
+      expect(r.reasons, [
+        'Reports are rising (average +12.5% per week).',
+        'Departments responded to only 25% of issues (1 of 4); target is 75%.',
+        'Pending issues have waited 6 days on average without a response; target is 3 days or less.',
+        'Departments took 3.5 days on average to respond; target is 3 days or less.',
+      ]);
+      final good = buildDailyInsights([], [], now).insights[0];
+      expect(good.assessmentReasons, ['Reports are not rising, and departments are responding on time.']);
+      expect(good.shareText, endsWith('Assessment: Good. Reports are not rising, and departments are responding on time.'));
+    });
+
+    test('department breakdown sorts by forwarded, then pending, ties in first-seen order', () {
+      Map<String, Object?> f(String id, String dept) =>
+          base({'id': id, 'department_id': dept, 'department_assigned_at': '2026-11-16T00:00:00Z'});
+      final rows = [f('a1', 'a'), f('b1', 'b'), f('b2', 'b'), f('c1', 'c'), f('d1', 'd')];
+      final history = [{'grievance_id': 'a1', 'status': 'in_progress', 'created_at': '2026-11-17T00:00:00Z'}];
+      final split = buildDailyInsights(rows, history, now).insights[0].departmentBreakdown;
+      expect(split.map((d) => d.departmentId), ['b', 'c', 'd', 'a']);
     });
 
     test('maps sewage and law & order into their own reports', () {

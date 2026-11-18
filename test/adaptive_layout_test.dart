@@ -101,6 +101,7 @@ void main() {
 
   final screens = <String, Widget Function()>{
     'Home': () => const HomeScreen(),
+    'Home cabinet photos': () => const Scaffold(body: SingleChildScrollView(child: CabinetSection())),
     'File grievance': () => const FileGrievanceScreen(),
     'Track': () => const TrackScreen(),
     'Helplines': () => const HelplinesPage(),
@@ -123,12 +124,28 @@ void main() {
     }
   }
 
-  for (final e in {'Home': () => const HomeScreen(), 'File grievance': () => const FileGrievanceScreen(), 'Staff daily insights': insightsScreen, 'Staff board by stage': boardScreen}.entries) {
+  for (final e in {'Home': () => const HomeScreen(), 'Home cabinet photos': () => const Scaffold(body: SingleChildScrollView(child: CabinetSection())), 'File grievance': () => const FileGrievanceScreen(), 'Staff daily insights': insightsScreen, 'Staff board by stage': boardScreen}.entries) {
     testWidgets('${e.key} fits in Tamil with large text on a small phone', (tester) async {
       await pumpAt(tester, devices.first, e.value(), lang: 'ta', textScale: 1.6);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Home photo carousel loops in both directions', (tester) async {
+    await pumpAt(tester, devices.first, const Scaffold(body: SingleChildScrollView(child: CabinetSection())));
+    expect(find.text('01 / 02'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('Next photograph'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Next photograph'));
+    await tester.pumpAndSettle();
+    expect(find.text('02 / 02'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next photograph'));
+    await tester.pumpAndSettle();
+    expect(find.text('01 / 02'), findsOneWidget);
+    await tester.tap(find.byTooltip('Previous photograph'));
+    await tester.pumpAndSettle();
+    expect(find.text('02 / 02'), findsOneWidget);
+  });
 
   testWidgets('TwoPane splits exactly on a dual-screen hinge', (tester) async {
     await pumpAt(
