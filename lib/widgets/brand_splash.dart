@@ -79,7 +79,11 @@ class _BrandSplashState extends State<BrandSplash> with TickerProviderStateMixin
                             child: Padding(
                               padding: const EdgeInsets.all(2.5),
                               child: ClipOval(
-                                child: Image.asset('assets/branding/app_icon.png', fit: BoxFit.cover),
+                                child: Image.asset(
+                                  'assets/images/marie-wilson-portrait.jpg',
+                                  fit: BoxFit.cover,
+                                  alignment: const Alignment(0, -0.42),
+                                ),
                               ),
                             ),
                           ),
